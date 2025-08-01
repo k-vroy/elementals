@@ -1,0 +1,20 @@
+# Elementals RPG Game Settings
+
+# World Generation Settings
+world:
+  map_width: 256
+  map_height: 256
+  tile_size: 16.0
+
+# Camera Settings
+camera:
+  movement_speed: 200.0
+  zoom_min: 0.1
+  zoom_max: 10.0
+  mouse_sensitivity: 1.0
+
+# Game Settings
+game:
+  window_title: "Elementals RPG"
+  target_fps: 60
+  show_fps: true

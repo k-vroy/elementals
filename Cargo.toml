@@ -1,0 +1,30 @@
+[package]
+name = "elementals"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = { version = "0.15", features = ["dynamic_linking"] }
+bevy_ecs_tilemap = "0.15"
+noise = "0.9"
+pathfinding = "4.0"
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+
+# Fast compilation profile for development
+[profile.dev]
+opt-level = 1        # Basic optimizations for better performance
+debug = true         # Keep debug info
+incremental = true   # Enable incremental compilation
+
+# Optimize dependencies in dev mode for better runtime performance
+[profile.dev.package."*"]
+opt-level = 3
+
+# Fast dev profile with minimal optimizations
+[profile.dev-fast]
+inherits = "dev"
+opt-level = 0
+debug = 1            # Minimal debug info
+incremental = true
