@@ -24,7 +24,11 @@ fn main() {
     app.add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(bevy_ecs_tilemap::TilemapPlugin)
         .insert_resource(MouseDragState::default())
-        .add_systems(Startup, (setup_camera, generate_world, spawn_player))
+        .add_systems(Startup, (
+            setup_camera,
+            generate_world,
+            spawn_player.after(generate_world),
+        ))
         .add_systems(Update, (
             camera_movement, 
             camera_zoom, 
