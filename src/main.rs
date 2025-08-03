@@ -10,6 +10,7 @@ use systems::world_gen::generate_world;
 use systems::camera::{CameraController, MouseDragState, camera_movement, camera_zoom, mouse_camera_pan};
 use systems::fps_counter::{setup_fps_counter, update_fps_counter};
 use systems::player::{spawn_player, handle_player_movement_input, move_player_to_target};
+use systems::water_shader::WaterShaderPlugin;
 
 fn main() {
     // Load settings from YAML file, fall back to defaults if file doesn't exist
@@ -23,6 +24,7 @@ fn main() {
     
     app.add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(bevy_ecs_tilemap::TilemapPlugin)
+        .add_plugins(WaterShaderPlugin)
         .insert_resource(MouseDragState::default())
         .add_systems(Startup, (
             setup_camera,
