@@ -5,6 +5,9 @@ mod systems;
 mod components;
 mod resources;
 
+#[cfg(test)]
+mod tests;
+
 use resources::GameConfig;
 use systems::world_gen::generate_world;
 use systems::camera::{CameraController, MouseDragState, camera_movement, camera_zoom, mouse_camera_pan};

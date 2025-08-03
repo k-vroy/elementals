@@ -6,7 +6,7 @@ use noise::{NoiseFn, Perlin, Simplex};
 use pathfinding::prelude::astar;
 use rand::prelude::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TerrainType {
     Grass = 0,
     Dirt = 1,

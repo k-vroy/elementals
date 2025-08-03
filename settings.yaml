@@ -2,8 +2,8 @@
 
 # World Generation Settings
 world:
-  map_width: 256
-  map_height: 256
+  map_width: 1024
+  map_height: 1024
   tile_size: 16.0
 
 # Camera Settings
