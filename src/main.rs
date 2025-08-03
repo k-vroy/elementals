@@ -12,7 +12,9 @@ use resources::GameConfig;
 use systems::world_gen::generate_world;
 use systems::camera::{CameraController, MouseDragState, camera_movement, camera_zoom, mouse_camera_pan};
 use systems::fps_counter::{setup_fps_counter, update_fps_counter};
-use systems::player::{spawn_player, handle_player_movement_input, move_player_to_target};
+use systems::spawn::{spawn_player, spawn_wolves};
+use systems::input::handle_player_input;
+use systems::pawn::move_pawn_to_target;
 use systems::water_shader::WaterShaderPlugin;
 
 fn main() {
@@ -33,13 +35,14 @@ fn main() {
             setup_camera,
             generate_world,
             spawn_player.after(generate_world),
+            spawn_wolves.after(generate_world),
         ))
         .add_systems(Update, (
             camera_movement, 
             camera_zoom, 
             mouse_camera_pan,
-            handle_player_movement_input,
-            move_player_to_target,
+            handle_player_input,
+            move_pawn_to_target,
         ));
 
     // Conditionally add FPS counter based on settings
