@@ -28,24 +28,24 @@ impl WolfAI {
     }
 }
 
-pub fn wolf_ai_system(
+pub fn wandering_ai_system(
     time: Res<Time>,
     terrain_map: Res<TerrainMap>,
     mut commands: Commands,
-    mut wolf_query: Query<(Entity, &Transform, &Pawn, &mut WolfAI), With<Pawn>>,
+    mut wandering_query: Query<(Entity, &Transform, &Pawn, &mut WolfAI), With<Pawn>>,
 ) {
     let mut rng = rand::thread_rng();
     
-    for (entity, transform, pawn, mut wolf_ai) in wolf_query.iter_mut() {
-        if pawn.pawn_type != PawnType::Wolf {
+    for (entity, transform, pawn, mut ai) in wandering_query.iter_mut() {
+        if pawn.pawn_type != PawnType::Wolf && pawn.pawn_type != PawnType::Rabbit {
             continue;
         }
 
         // Update timer
-        wolf_ai.next_move_time -= time.delta_secs();
+        ai.next_move_time -= time.delta_secs();
         
         // Time to move?
-        if wolf_ai.next_move_time <= 0.0 {
+        if ai.next_move_time <= 0.0 {
             let current_pos = (transform.translation.x, transform.translation.y);
             
             // Try to find a random nearby passable location
@@ -55,7 +55,7 @@ pub fn wolf_ai_system(
                 
                 // Generate random offset within move range
                 let angle = rng.gen_range(0.0..std::f32::consts::TAU);
-                let distance = rng.gen_range(32.0..wolf_ai.move_range);
+                let distance = rng.gen_range(32.0..ai.move_range);
                 
                 let target_x = current_pos.0 + angle.cos() * distance;
                 let target_y = current_pos.1 + angle.sin() * distance;
@@ -74,21 +74,29 @@ pub fn wolf_ai_system(
             }
             
             // Schedule next move regardless of whether we found a path
-            wolf_ai.schedule_next_move();
+            ai.schedule_next_move();
         }
     }
 }
 
-// System to add WolfAI component to newly spawned wolves
-pub fn setup_wolf_ai(
+// System to add WolfAI component to newly spawned wandering creatures (wolves and rabbits)
+pub fn setup_wandering_ai(
     mut commands: Commands,
-    wolf_query: Query<(Entity, &Pawn), (With<Pawn>, Without<WolfAI>)>,
+    wandering_query: Query<(Entity, &Pawn), (With<Pawn>, Without<WolfAI>)>,
 ) {
-    for (entity, pawn) in wolf_query.iter() {
-        if pawn.pawn_type == PawnType::Wolf {
-            let mut wolf_ai = WolfAI::new();
-            wolf_ai.schedule_next_move(); // Schedule first move
-            commands.entity(entity).insert(wolf_ai);
+    for (entity, pawn) in wandering_query.iter() {
+        if pawn.pawn_type == PawnType::Wolf || pawn.pawn_type == PawnType::Rabbit {
+            let mut ai = WolfAI::new();
+            
+            // Rabbits move more frequently and with shorter range
+            if pawn.pawn_type == PawnType::Rabbit {
+                ai.move_interval_min = 1.5; // Rabbits move every 1.5-4 seconds
+                ai.move_interval_max = 4.0;
+                ai.move_range = 96.0; // Smaller range for rabbits (3 tiles)
+            }
+            
+            ai.schedule_next_move(); // Schedule first move
+            commands.entity(entity).insert(ai);
         }
     }
 }

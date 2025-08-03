@@ -12,10 +12,10 @@ use resources::GameConfig;
 use systems::world_gen::generate_world;
 use systems::camera::{CameraController, MouseDragState, camera_movement, camera_zoom, mouse_camera_pan};
 use systems::fps_counter::{setup_fps_counter, update_fps_counter};
-use systems::spawn::{spawn_player, spawn_wolves};
+use systems::spawn::{spawn_player, spawn_wolves, spawn_rabbits};
 use systems::input::handle_player_input;
 use systems::pawn::move_pawn_to_target;
-use systems::ai::{wolf_ai_system, setup_wolf_ai};
+use systems::ai::{wandering_ai_system, setup_wandering_ai};
 use systems::water_shader::WaterShaderPlugin;
 
 fn main() {
@@ -37,6 +37,7 @@ fn main() {
             generate_world,
             spawn_player.after(generate_world),
             spawn_wolves.after(generate_world),
+            spawn_rabbits.after(generate_world),
         ))
         .add_systems(Update, (
             camera_movement, 
@@ -44,8 +45,8 @@ fn main() {
             mouse_camera_pan,
             handle_player_input,
             move_pawn_to_target,
-            setup_wolf_ai,
-            wolf_ai_system,
+            setup_wandering_ai,
+            wandering_ai_system,
         ));
 
     // Conditionally add FPS counter based on settings

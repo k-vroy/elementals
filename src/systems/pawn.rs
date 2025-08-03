@@ -12,6 +12,7 @@ pub struct Pawn {
 pub enum PawnType {
     Player,
     Wolf,
+    Rabbit,
 }
 
 impl Pawn {
@@ -28,6 +29,14 @@ impl Pawn {
             pawn_type: PawnType::Wolf,
             move_speed: 120.0,
             sprite_path: "wolf.png".to_string(),
+        }
+    }
+
+    pub fn new_rabbit() -> Self {
+        Self {
+            pawn_type: PawnType::Rabbit,
+            move_speed: 100.0,
+            sprite_path: "rabbit.png".to_string(),
         }
     }
 }
@@ -132,6 +141,7 @@ pub fn move_pawn_to_target(
                     match pawn.pawn_type {
                         PawnType::Player => println!("Player reached destination: {:?}", target.target_position),
                         PawnType::Wolf => println!("Wolf reached destination: {:?}", target.target_position),
+                        PawnType::Rabbit => println!("Rabbit reached destination: {:?}", target.target_position),
                     }
                     target.reset();
                 } else {
