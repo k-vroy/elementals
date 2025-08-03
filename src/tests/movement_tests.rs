@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::systems::world_gen::{TerrainMap, TerrainType};
-use crate::systems::player::PlayerTarget;
+use crate::systems::pawn::PawnTarget;
 use crate::tests::create_test_terrain_map;
 
 #[cfg(test)]
@@ -102,76 +102,74 @@ mod tests {
     }
 
     #[test]
-    fn test_player_target_creation() {
+    fn test_pawn_target_creation() {
         let target_pos = Vec3::new(100.0, 200.0, 0.0);
-        let move_speed = 150.0;
         
-        let player_target = PlayerTarget::new(target_pos, move_speed);
+        let pawn_target = PawnTarget::new(target_pos);
         
-        assert_eq!(player_target.target_position, target_pos);
-        assert_eq!(player_target.move_speed, move_speed);
-        assert_eq!(player_target.path.len(), 1);
-        assert_eq!(player_target.path[0], target_pos);
-        assert_eq!(player_target.current_waypoint_index, 0);
+        assert_eq!(pawn_target.target_position, target_pos);
+        assert_eq!(pawn_target.path.len(), 1);
+        assert_eq!(pawn_target.path[0], target_pos);
+        assert_eq!(pawn_target.current_waypoint_index, 0);
     }
 
     #[test]
-    fn test_player_target_path_setting() {
-        let mut player_target = PlayerTarget::new(Vec3::ZERO, 100.0);
+    fn test_pawn_target_path_setting() {
+        let mut pawn_target = PawnTarget::new(Vec3::ZERO);
         
         let path = vec![(10.0, 20.0), (30.0, 40.0), (50.0, 60.0)];
-        player_target.set_path(path.clone());
+        pawn_target.set_path(path.clone());
         
-        assert_eq!(player_target.path.len(), 3);
-        assert_eq!(player_target.current_waypoint_index, 0);
+        assert_eq!(pawn_target.path.len(), 3);
+        assert_eq!(pawn_target.current_waypoint_index, 0);
         
         // Check that target position is set to last waypoint
         let expected_target = Vec3::new(50.0, 60.0, 100.0);
-        assert_eq!(player_target.target_position, expected_target);
+        assert_eq!(pawn_target.target_position, expected_target);
     }
 
     #[test]
-    fn test_player_target_waypoint_advancement() {
-        let mut player_target = PlayerTarget::new(Vec3::ZERO, 100.0);
+    fn test_pawn_target_waypoint_advancement() {
+        let mut pawn_target = PawnTarget::new(Vec3::ZERO);
         let path = vec![(10.0, 20.0), (30.0, 40.0), (50.0, 60.0)];
-        player_target.set_path(path);
+        pawn_target.set_path(path);
         
         // Initially at first waypoint
-        assert_eq!(player_target.current_waypoint_index, 0);
-        assert!(!player_target.is_at_destination());
+        assert_eq!(pawn_target.current_waypoint_index, 0);
+        assert!(!pawn_target.is_at_destination());
         
         // Advance waypoint
-        player_target.advance_waypoint();
-        assert_eq!(player_target.current_waypoint_index, 1);
-        assert!(!player_target.is_at_destination());
+        pawn_target.advance_waypoint();
+        assert_eq!(pawn_target.current_waypoint_index, 1);
+        assert!(!pawn_target.is_at_destination());
         
         // Advance to last waypoint
-        player_target.advance_waypoint();
-        assert_eq!(player_target.current_waypoint_index, 2);
-        assert!(player_target.is_at_destination());
+        pawn_target.advance_waypoint();
+        assert_eq!(pawn_target.current_waypoint_index, 2);
+        assert!(pawn_target.is_at_destination());
         
         // Advancing past end shouldn't change index
-        player_target.advance_waypoint();
-        assert_eq!(player_target.current_waypoint_index, 2);
+        pawn_target.advance_waypoint();
+        assert_eq!(pawn_target.current_waypoint_index, 2);
     }
 
     #[test]
-    fn test_player_target_reset() {
-        let mut player_target = PlayerTarget::new(Vec3::new(100.0, 100.0, 0.0), 150.0);
+    fn test_pawn_target_reset() {
+        let mut pawn_target = PawnTarget::new(Vec3::new(100.0, 100.0, 0.0));
         let path = vec![(10.0, 20.0), (30.0, 40.0)];
-        player_target.set_path(path);
-        player_target.advance_waypoint();
+        pawn_target.set_path(path);
+        pawn_target.advance_waypoint();
         
         // Before reset
-        assert!(!player_target.path.is_empty());
-        assert_ne!(player_target.current_waypoint_index, 0);
-        assert_ne!(player_target.target_position, Vec3::ZERO);
+        assert!(!pawn_target.path.is_empty());
+        assert_ne!(pawn_target.current_waypoint_index, 0);
+        assert_ne!(pawn_target.target_position, Vec3::ZERO);
         
         // After reset
-        player_target.reset();
-        assert!(player_target.path.is_empty());
-        assert_eq!(player_target.current_waypoint_index, 0);
-        assert_eq!(player_target.target_position, Vec3::ZERO);
+        pawn_target.reset();
+        assert!(pawn_target.path.is_empty());
+        assert_eq!(pawn_target.current_waypoint_index, 0);
+        assert_eq!(pawn_target.target_position, Vec3::ZERO);
     }
 
     #[test]

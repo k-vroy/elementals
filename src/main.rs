@@ -15,6 +15,7 @@ use systems::fps_counter::{setup_fps_counter, update_fps_counter};
 use systems::spawn::{spawn_player, spawn_wolves};
 use systems::input::handle_player_input;
 use systems::pawn::move_pawn_to_target;
+use systems::ai::{wolf_ai_system, setup_wolf_ai};
 use systems::water_shader::WaterShaderPlugin;
 
 fn main() {
@@ -43,6 +44,8 @@ fn main() {
             mouse_camera_pan,
             handle_player_input,
             move_pawn_to_target,
+            setup_wolf_ai,
+            wolf_ai_system,
         ));
 
     // Conditionally add FPS counter based on settings

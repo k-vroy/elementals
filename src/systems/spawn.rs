@@ -17,7 +17,7 @@ pub fn spawn_wolves(
     terrain_map: Res<TerrainMap>,
 ) {
     // Spawn a few wolves at random locations
-    for _ in 0..3 {
+    for _ in 0..100 {
         let wolf_pawn = Pawn::new_wolf();
         spawn_pawn(&mut commands, &asset_server, &terrain_map, wolf_pawn, None);
     }

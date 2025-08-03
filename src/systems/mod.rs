@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod camera;
 pub mod fps_counter;
 pub mod input;
