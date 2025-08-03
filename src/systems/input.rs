@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use crate::resources::GameConfig;
 use crate::systems::world_gen::TerrainMap;
-use crate::systems::pawn::{Pawn, PawnTarget, PawnType};
+use crate::systems::pawn::{Pawn, PawnTarget};
 
 pub fn handle_player_input(
     mouse_input: Res<ButtonInput<MouseButton>>,
@@ -35,7 +35,7 @@ pub fn handle_player_input(
 
                         // Use pathfinding to find route to target for players only
                         for (entity, transform, pawn) in player_query.iter() {
-                            if pawn.pawn_type == PawnType::Player {
+                            if pawn.pawn_type == "player" {
                                 let player_pos = (transform.translation.x, transform.translation.y);
                                 let goal_pos = (snapped_x, snapped_y);
 

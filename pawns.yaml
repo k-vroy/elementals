@@ -1,0 +1,39 @@
+player:
+  sprite: "player.png"
+  move_speed: 150.0
+  spawn_count: 1
+  behaviours:
+    idle: null
+    controlled: player_input
+  eats:
+    pawns: []
+
+rabbit:
+  sprite: "rabbit.png"
+  move_speed: 100.0
+  spawn_count: 5
+  behaviours:
+    idle:
+      wandering:
+        move_interval_min: 1.5
+        move_interval_max: 4.0
+        move_range: 6
+    hunted: flee
+    eat: null
+  eats:
+    pawns: []
+
+wolf:
+  sprite: "wolf.png"
+  move_speed: 120.0
+  spawn_count: 3
+  behaviours:
+    idle:
+      wandering:
+        move_interval_min: 3.0
+        move_interval_max: 8.0
+        move_range: 1
+    flee: null
+    eat: hunt_solo
+  eats:
+    pawns: [rabbit]

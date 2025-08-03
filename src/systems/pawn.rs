@@ -1,43 +1,15 @@
 use bevy::prelude::*;
 use crate::systems::world_gen::TerrainMap;
+use crate::systems::pawn_config::{PawnConfig, PawnType};
 
 #[derive(Component)]
 pub struct Pawn {
     pub pawn_type: PawnType,
-    pub move_speed: f32,
-    pub sprite_path: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum PawnType {
-    Player,
-    Wolf,
-    Rabbit,
 }
 
 impl Pawn {
-    pub fn new_player() -> Self {
-        Self {
-            pawn_type: PawnType::Player,
-            move_speed: 150.0,
-            sprite_path: "player.png".to_string(),
-        }
-    }
-
-    pub fn new_wolf() -> Self {
-        Self {
-            pawn_type: PawnType::Wolf,
-            move_speed: 120.0,
-            sprite_path: "wolf.png".to_string(),
-        }
-    }
-
-    pub fn new_rabbit() -> Self {
-        Self {
-            pawn_type: PawnType::Rabbit,
-            move_speed: 100.0,
-            sprite_path: "rabbit.png".to_string(),
-        }
+    pub fn new(pawn_type: PawnType) -> Self {
+        Self { pawn_type }
     }
 }
 
@@ -93,6 +65,7 @@ pub fn spawn_pawn(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
     terrain_map: &Res<TerrainMap>,
+    pawn_config: &Res<PawnConfig>,
     pawn: Pawn,
     spawn_position: Option<(f32, f32)>,
 ) -> Entity {
@@ -108,8 +81,11 @@ pub fn spawn_pawn(
         }
     };
 
+    let pawn_def = pawn_config.get_pawn_definition(&pawn.pawn_type)
+        .expect("Pawn definition not found in config");
+
     commands.spawn((
-        Sprite::from_image(asset_server.load(&pawn.sprite_path)),
+        Sprite::from_image(asset_server.load(&pawn_def.sprite)),
         Transform::from_translation(Vec3::new(position.0, position.1, 100.0)),
         pawn,
     )).id()
@@ -117,6 +93,7 @@ pub fn spawn_pawn(
 
 pub fn move_pawn_to_target(
     time: Res<Time>,
+    pawn_config: Res<PawnConfig>,
     mut pawn_query: Query<(&mut Transform, &mut PawnTarget, &Pawn)>,
 ) {
     for (mut transform, mut target, pawn) in pawn_query.iter_mut() {
@@ -124,8 +101,11 @@ pub fn move_pawn_to_target(
             let distance = transform.translation.distance(current_waypoint);
             
             if distance > 2.0 { // Close enough threshold for waypoints
+                let pawn_def = pawn_config.get_pawn_definition(&pawn.pawn_type)
+                    .expect("Pawn definition not found in config");
+                
                 let direction = (current_waypoint - transform.translation).normalize();
-                let movement = direction * pawn.move_speed * time.delta_secs();
+                let movement = direction * pawn_def.move_speed * time.delta_secs();
                 
                 // Don't overshoot the waypoint
                 if movement.length() > distance {
@@ -138,11 +118,7 @@ pub fn move_pawn_to_target(
                 transform.translation = current_waypoint;
                 
                 if target.is_at_destination() {
-                    match pawn.pawn_type {
-                        PawnType::Player => println!("Player reached destination: {:?}", target.target_position),
-                        PawnType::Wolf => println!("Wolf reached destination: {:?}", target.target_position),
-                        PawnType::Rabbit => println!("Rabbit reached destination: {:?}", target.target_position),
-                    }
+                    println!("{} reached destination: {:?}", pawn.pawn_type, target.target_position);
                     target.reset();
                 } else {
                     target.advance_waypoint();

@@ -12,9 +12,10 @@ use resources::GameConfig;
 use systems::world_gen::generate_world;
 use systems::camera::{CameraController, MouseDragState, camera_movement, camera_zoom, mouse_camera_pan};
 use systems::fps_counter::{setup_fps_counter, update_fps_counter};
-use systems::spawn::{spawn_player, spawn_wolves, spawn_rabbits};
+use systems::spawn::spawn_all_pawns;
 use systems::input::handle_player_input;
 use systems::pawn::move_pawn_to_target;
+use systems::pawn_config::PawnConfig;
 use systems::ai::{wandering_ai_system, setup_wandering_ai};
 use systems::water_shader::WaterShaderPlugin;
 
@@ -26,18 +27,21 @@ fn main() {
             GameConfig::default()
         });
 
+    // Load pawn configuration from YAML file
+    let pawn_config = PawnConfig::load_from_file("pawns.yaml")
+        .expect("Failed to load pawns.yaml configuration file");
+
     let mut app = App::new();
     
     app.add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(bevy_ecs_tilemap::TilemapPlugin)
         .add_plugins(WaterShaderPlugin)
         .insert_resource(MouseDragState::default())
+        .insert_resource(pawn_config)
         .add_systems(Startup, (
             setup_camera,
             generate_world,
-            spawn_player.after(generate_world),
-            spawn_wolves.after(generate_world),
-            spawn_rabbits.after(generate_world),
+            spawn_all_pawns.after(generate_world),
         ))
         .add_systems(Update, (
             camera_movement, 

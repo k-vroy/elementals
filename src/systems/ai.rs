@@ -1,29 +1,25 @@
 use bevy::prelude::*;
 use rand::prelude::*;
-use crate::systems::pawn::{Pawn, PawnTarget, PawnType};
+use crate::systems::pawn::{Pawn, PawnTarget};
+use crate::systems::pawn_config::PawnConfig;
 use crate::systems::world_gen::TerrainMap;
+use crate::resources::GameConfig;
 
 #[derive(Component)]
-pub struct WolfAI {
+pub struct WanderingAI {
     pub next_move_time: f32,
-    pub move_interval_min: f32,
-    pub move_interval_max: f32,
-    pub move_range: f32,
 }
 
-impl WolfAI {
+impl WanderingAI {
     pub fn new() -> Self {
         Self {
             next_move_time: 0.0,
-            move_interval_min: 3.0, // Minimum 3 seconds between moves
-            move_interval_max: 8.0, // Maximum 8 seconds between moves
-            move_range: 128.0,      // Maximum distance to move (4 tiles * 32 tile_size)
         }
     }
 
-    pub fn schedule_next_move(&mut self) {
+    pub fn schedule_next_move(&mut self, min_interval: f32, max_interval: f32) {
         let mut rng = rand::thread_rng();
-        let interval = rng.gen_range(self.move_interval_min..=self.move_interval_max);
+        let interval = rng.gen_range(min_interval..=max_interval);
         self.next_move_time = interval;
     }
 }
@@ -31,15 +27,19 @@ impl WolfAI {
 pub fn wandering_ai_system(
     time: Res<Time>,
     terrain_map: Res<TerrainMap>,
+    pawn_config: Res<PawnConfig>,
+    config: Res<GameConfig>,
     mut commands: Commands,
-    mut wandering_query: Query<(Entity, &Transform, &Pawn, &mut WolfAI), With<Pawn>>,
+    mut wandering_query: Query<(Entity, &Transform, &Pawn, &mut WanderingAI), With<Pawn>>,
 ) {
     let mut rng = rand::thread_rng();
     
     for (entity, transform, pawn, mut ai) in wandering_query.iter_mut() {
-        if pawn.pawn_type != PawnType::Wolf && pawn.pawn_type != PawnType::Rabbit {
-            continue;
-        }
+        // Get wandering config for this pawn's idle behavior
+        let wandering_config = match pawn_config.get_wandering_config(&pawn.pawn_type, "idle") {
+            Some(config) => config,
+            None => continue, // Skip pawns without wandering behavior
+        };
 
         // Update timer
         ai.next_move_time -= time.delta_secs();
@@ -53,9 +53,12 @@ pub fn wandering_ai_system(
             while attempts < 10 {
                 attempts += 1;
                 
-                // Generate random offset within move range
+                // Generate random offset within move range (convert cells to pixels)
                 let angle = rng.gen_range(0.0..std::f32::consts::TAU);
-                let distance = rng.gen_range(32.0..ai.move_range);
+                let move_range_pixels = wandering_config.move_range as f32 * config.tile_size;
+                let min_distance = config.tile_size;
+                let max_distance = move_range_pixels.max(min_distance + 1.0);
+                let distance = rng.gen_range(min_distance..max_distance);
                 
                 let target_x = current_pos.0 + angle.cos() * distance;
                 let target_y = current_pos.1 + angle.sin() * distance;
@@ -74,28 +77,22 @@ pub fn wandering_ai_system(
             }
             
             // Schedule next move regardless of whether we found a path
-            ai.schedule_next_move();
+            ai.schedule_next_move(wandering_config.move_interval_min, wandering_config.move_interval_max);
         }
     }
 }
 
-// System to add WolfAI component to newly spawned wandering creatures (wolves and rabbits)
+// System to add WanderingAI component to pawns with wandering behavior
 pub fn setup_wandering_ai(
     mut commands: Commands,
-    wandering_query: Query<(Entity, &Pawn), (With<Pawn>, Without<WolfAI>)>,
+    pawn_config: Res<PawnConfig>,
+    wandering_query: Query<(Entity, &Pawn), (With<Pawn>, Without<WanderingAI>)>,
 ) {
     for (entity, pawn) in wandering_query.iter() {
-        if pawn.pawn_type == PawnType::Wolf || pawn.pawn_type == PawnType::Rabbit {
-            let mut ai = WolfAI::new();
-            
-            // Rabbits move more frequently and with shorter range
-            if pawn.pawn_type == PawnType::Rabbit {
-                ai.move_interval_min = 1.5; // Rabbits move every 1.5-4 seconds
-                ai.move_interval_max = 4.0;
-                ai.move_range = 96.0; // Smaller range for rabbits (3 tiles)
-            }
-            
-            ai.schedule_next_move(); // Schedule first move
+        // Check if this pawn has wandering behavior configured
+        if let Some(wandering_config) = pawn_config.get_wandering_config(&pawn.pawn_type, "idle") {
+            let mut ai = WanderingAI::new();
+            ai.schedule_next_move(wandering_config.move_interval_min, wandering_config.move_interval_max);
             commands.entity(entity).insert(ai);
         }
     }
