@@ -46,6 +46,12 @@ impl PlayerTarget {
     pub fn is_at_destination(&self) -> bool {
         self.current_waypoint_index >= self.path.len() - 1
     }
+
+    pub fn reset(&mut self) {
+        self.path.clear();
+        self.current_waypoint_index = 0;
+        self.target_position = Vec3::ZERO;
+    }
 }
 
 pub fn spawn_player(
@@ -197,10 +203,12 @@ pub fn move_player_to_target(
             } else {
                 // Reached current waypoint, advance to next
                 transform.translation = current_waypoint;
-                target.advance_waypoint();
                 
                 if target.is_at_destination() {
                     println!("Player reached destination: {:?}", target.target_position);
+                    target.reset();
+                } else {
+                    target.advance_waypoint();
                 }
             }
         }
