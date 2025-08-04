@@ -46,6 +46,8 @@ pub struct PawnEats {
 pub struct PawnDefinition {
     pub sprite: String,
     pub move_speed: f32,
+    pub max_health: u32,
+    pub max_endurance: u32,
     pub spawn_count: u32,
     pub behaviours: PawnBehaviours,
     pub eats: PawnEats,

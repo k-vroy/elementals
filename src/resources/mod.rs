@@ -14,6 +14,8 @@ pub struct GameConfig {
     pub window_title: String,
     pub target_fps: u32,
     pub show_fps: bool,
+    pub endurance_cost_per_cell: f32,
+    pub health_loss_interval: f32,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -43,6 +45,8 @@ struct GameSettings {
     window_title: String,
     target_fps: u32,
     show_fps: bool,
+    endurance_cost_per_cell: Option<f32>,
+    health_loss_interval: Option<f32>,
 }
 
 impl GameConfig {
@@ -61,6 +65,8 @@ impl GameConfig {
             window_title: settings.game.window_title,
             target_fps: settings.game.target_fps,
             show_fps: settings.game.show_fps,
+            endurance_cost_per_cell: settings.game.endurance_cost_per_cell.unwrap_or(0.1),
+            health_loss_interval: settings.game.health_loss_interval.unwrap_or(5.0),
         })
     }
 
@@ -76,6 +82,8 @@ impl GameConfig {
             window_title: "Elementals RPG".to_string(),
             target_fps: 60,
             show_fps: false, // Disabled by default in code
+            endurance_cost_per_cell: 0.1,
+            health_loss_interval: 5.0,
         }
     }
 }

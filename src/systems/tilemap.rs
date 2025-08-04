@@ -6,7 +6,6 @@ use crate::resources::GameConfig;
 pub fn setup_tilemap(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
 ) {
     let texture_handle: Handle<Image> = asset_server.load("tileset.png");
     let map_size = TilemapSize { x: 32, y: 32 };

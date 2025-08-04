@@ -1,9 +1,13 @@
 player:
   sprite: "player.png"
   move_speed: 150.0
+  max_health: 80
+  max_endurance: 150
   spawn_count: 1
   behaviours:
     idle: null
+    looking_for_food: null
+    hunted: null
     controlled: player_input
   eats:
     pawns: []
@@ -11,6 +15,8 @@ player:
 rabbit:
   sprite: "rabbit.png"
   move_speed: 100.0
+  max_health: 25
+  max_endurance: 10
   spawn_count: 5
   behaviours:
     idle:
@@ -19,13 +25,15 @@ rabbit:
         move_interval_max: 4.0
         move_range: 6
     hunted: flee
-    eat: null
+    looking_for_food: null
   eats:
     pawns: []
 
 wolf:
   sprite: "wolf.png"
   move_speed: 120.0
+  max_health: 110
+  max_endurance: 60
   spawn_count: 3
   behaviours:
     idle:
@@ -33,7 +41,7 @@ wolf:
         move_interval_min: 3.0
         move_interval_max: 8.0
         move_range: 1
-    flee: null
-    eat: hunt_solo
+    hunted: null
+    looking_for_food: hunt_solo
   eats:
     pawns: [rabbit]

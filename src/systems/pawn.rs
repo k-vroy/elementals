@@ -1,10 +1,43 @@
 use bevy::prelude::*;
 use crate::systems::world_gen::TerrainMap;
 use crate::systems::pawn_config::{PawnConfig, PawnType};
+use crate::resources::GameConfig;
 
 #[derive(Component)]
 pub struct Pawn {
     pub pawn_type: PawnType,
+}
+
+#[derive(Component)]
+pub struct Health {
+    pub current: f32,
+    pub max: f32,
+}
+
+impl Health {
+    pub fn new(max: u32) -> Self {
+        Self {
+            current: max as f32,
+            max: max as f32,
+        }
+    }
+}
+
+#[derive(Component)]  
+pub struct Endurance {
+    pub current: f32,
+    pub max: f32,
+    pub health_loss_timer: f32,
+}
+
+impl Endurance {
+    pub fn new(max: u32) -> Self {  
+        Self {
+            current: max as f32,
+            max: max as f32,
+            health_loss_timer: 0.0,
+        }
+    }
 }
 
 impl Pawn {
@@ -88,15 +121,18 @@ pub fn spawn_pawn(
         Sprite::from_image(asset_server.load(&pawn_def.sprite)),
         Transform::from_translation(Vec3::new(position.0, position.1, 100.0)),
         pawn,
+        Health::new(pawn_def.max_health),
+        Endurance::new(pawn_def.max_endurance),
     )).id()
 }
 
 pub fn move_pawn_to_target(
     time: Res<Time>,
     pawn_config: Res<PawnConfig>,
-    mut pawn_query: Query<(&mut Transform, &mut PawnTarget, &Pawn)>,
+    config: Res<GameConfig>,
+    mut pawn_query: Query<(&mut Transform, &mut PawnTarget, &Pawn, &mut Endurance)>,
 ) {
-    for (mut transform, mut target, pawn) in pawn_query.iter_mut() {
+    for (mut transform, mut target, pawn, mut endurance) in pawn_query.iter_mut() {
         if let Some(current_waypoint) = target.get_current_waypoint() {
             let distance = transform.translation.distance(current_waypoint);
             
@@ -107,12 +143,21 @@ pub fn move_pawn_to_target(
                 let direction = (current_waypoint - transform.translation).normalize();
                 let movement = direction * pawn_def.move_speed * time.delta_secs();
                 
-                // Don't overshoot the waypoint
-                if movement.length() > distance {
+                let actual_movement_distance = if movement.length() > distance {
+                    // Don't overshoot the waypoint
+                    let final_distance = distance;
                     transform.translation = current_waypoint;
+                    final_distance
                 } else {
+                    let move_distance = movement.length();
                     transform.translation += movement;
-                }
+                    move_distance
+                };
+                
+                // Reduce endurance based on distance moved
+                let cells_moved = actual_movement_distance / config.tile_size;
+                let endurance_cost = cells_moved * config.endurance_cost_per_cell;
+                endurance.current = (endurance.current - endurance_cost).max(0.0);
             } else {
                 // Reached current waypoint, advance to next
                 transform.translation = current_waypoint;
@@ -124,6 +169,32 @@ pub fn move_pawn_to_target(
                     target.advance_waypoint();
                 }
             }
+        }
+    }
+}
+
+pub fn endurance_health_loss_system(
+    time: Res<Time>,
+    config: Res<GameConfig>,
+    mut pawn_query: Query<(&mut Health, &mut Endurance), With<Pawn>>,
+) {
+    for (mut health, mut endurance) in pawn_query.iter_mut() {
+        if endurance.current <= 0.0 {
+            // Update health loss timer
+            endurance.health_loss_timer += time.delta_secs();
+            
+            // Check if it's time to lose health
+            if endurance.health_loss_timer >= config.health_loss_interval {
+                health.current = (health.current - 1.0).max(0.0);
+                endurance.health_loss_timer = 0.0; // Reset timer
+                
+                if health.current <= 0.0 {
+                    println!("Pawn has died from exhaustion!");
+                }
+            }
+        } else {
+            // Reset health loss timer if endurance is above 0
+            endurance.health_loss_timer = 0.0;
         }
     }
 }

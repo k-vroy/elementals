@@ -14,7 +14,7 @@ use systems::camera::{CameraController, MouseDragState, camera_movement, camera_
 use systems::fps_counter::{setup_fps_counter, update_fps_counter};
 use systems::spawn::spawn_all_pawns;
 use systems::input::handle_player_input;
-use systems::pawn::move_pawn_to_target;
+use systems::pawn::{move_pawn_to_target, endurance_health_loss_system};
 use systems::pawn_config::PawnConfig;
 use systems::ai::{wandering_ai_system, setup_wandering_ai};
 use systems::water_shader::WaterShaderPlugin;
@@ -51,6 +51,7 @@ fn main() {
             move_pawn_to_target,
             setup_wandering_ai,
             wandering_ai_system,
+            endurance_health_loss_system,
         ));
 
     // Conditionally add FPS counter based on settings
