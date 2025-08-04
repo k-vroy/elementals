@@ -176,9 +176,9 @@ pub fn move_pawn_to_target(
 pub fn endurance_health_loss_system(
     time: Res<Time>,
     config: Res<GameConfig>,
-    mut pawn_query: Query<(&mut Health, &mut Endurance), With<Pawn>>,
+    mut pawn_query: Query<(Entity, &mut Health, &mut Endurance, &Pawn)>,
 ) {
-    for (mut health, mut endurance) in pawn_query.iter_mut() {
+    for (_entity, mut health, mut endurance, _pawn) in pawn_query.iter_mut() {
         if endurance.current <= 0.0 {
             // Update health loss timer
             endurance.health_loss_timer += time.delta_secs();
@@ -188,13 +188,22 @@ pub fn endurance_health_loss_system(
                 health.current = (health.current - 1.0).max(0.0);
                 endurance.health_loss_timer = 0.0; // Reset timer
                 
-                if health.current <= 0.0 {
-                    println!("Pawn has died from exhaustion!");
-                }
             }
         } else {
             // Reset health loss timer if endurance is above 0
             endurance.health_loss_timer = 0.0;
+        }
+    }
+}
+
+pub fn pawn_death_system(
+    mut commands: Commands,
+    pawn_query: Query<(Entity, &Health, &Pawn)>,
+) {
+    for (entity, health, pawn) in pawn_query.iter() {
+        if health.current <= 0.0 {
+            println!("{} has died!", pawn.pawn_type);
+            commands.entity(entity).despawn();
         }
     }
 }
