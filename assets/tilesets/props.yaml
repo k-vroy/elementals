@@ -1,0 +1,17 @@
+tileset_name: props
+tile_size: 16
+tiles_per_row: 16
+total_tiles: 2
+sprites:
+- name: mushroom
+  index: 0
+  x: 0
+  y: 0
+  width: 16
+  height: 16
+- name: tree
+  index: 1
+  x: 16
+  y: 0
+  width: 16
+  height: 16

@@ -13,7 +13,7 @@ player:
     pawns: []
 
 rabbit:
-  sprite: "rabbit.png"
+  sprite: "tileset::pawns::rabbit"
   move_speed: 100.0
   max_health: 25
   max_endurance: 10
@@ -30,7 +30,7 @@ rabbit:
     pawns: []
 
 wolf:
-  sprite: "wolf.png"
+  sprite: "tileset::pawns::wolf"
   move_speed: 120.0
   max_health: 110
   max_endurance: 60

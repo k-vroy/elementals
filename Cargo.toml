@@ -12,6 +12,20 @@ rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 
+# Dependencies for tileset generator binary only
+image = { version = "0.25", optional = true }
+walkdir = { version = "2.5", optional = true }
+
+# Binary configuration
+[[bin]]
+name = "tileset_generator"
+path = "src/bin/tileset_generator.rs"
+required-features = ["image", "walkdir"]
+
+[features]
+default = []
+tileset-generator = ["image", "walkdir"]
+
 # Fast compilation profile for development
 [profile.dev]
 opt-level = 1        # Basic optimizations for better performance
