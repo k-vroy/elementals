@@ -17,6 +17,7 @@ use systems::input::handle_player_input;
 use systems::pawn::{move_pawn_to_target, endurance_health_loss_system, pawn_death_system, endurance_behavior_switching_system, TilesetManager};
 use systems::pawn_config::PawnConfig;
 use systems::ai::{wandering_ai_system, setup_wandering_ai, hunt_solo_ai_system, setup_hunt_solo_ai};
+use systems::debug_display::{DebugDisplayState, toggle_debug_display, manage_debug_text_entities, update_debug_text, cleanup_orphaned_debug_text, manage_waypoint_lines, update_waypoint_lines, cleanup_orphaned_waypoint_lines};
 use systems::water_shader::WaterShaderPlugin;
 
 fn main() {
@@ -38,6 +39,7 @@ fn main() {
         .add_plugins(WaterShaderPlugin)
         .insert_resource(MouseDragState::default())
         .insert_resource(TilesetManager::default())
+        .insert_resource(DebugDisplayState::default())
         .insert_resource(pawn_config)
         .add_systems(Startup, (
             setup_camera,
@@ -49,6 +51,7 @@ fn main() {
             camera_zoom, 
             mouse_camera_pan,
             handle_player_input,
+            toggle_debug_display,
             move_pawn_to_target,
             setup_wandering_ai,
             wandering_ai_system,
@@ -57,6 +60,12 @@ fn main() {
             endurance_health_loss_system,
             endurance_behavior_switching_system.after(endurance_health_loss_system),
             pawn_death_system,
+            manage_debug_text_entities,
+            update_debug_text.after(manage_debug_text_entities),
+            cleanup_orphaned_debug_text.after(pawn_death_system),
+            manage_waypoint_lines,
+            update_waypoint_lines.after(manage_waypoint_lines),
+            cleanup_orphaned_waypoint_lines.after(move_pawn_to_target),
         ));
 
     // Conditionally add FPS counter based on settings

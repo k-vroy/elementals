@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod camera;
+pub mod debug_display;
 pub mod fps_counter;
 pub mod input;
 pub mod pawn;
