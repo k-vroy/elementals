@@ -137,10 +137,10 @@ pub fn hunt_solo_ai_system(
     pawn_config: Res<PawnConfig>,
     config: Res<GameConfig>,
     mut commands: Commands,
-    mut hunter_query: Query<(Entity, &Transform, &Pawn, &CurrentBehavior, &mut HuntSoloAI, &mut Endurance), With<Pawn>>,
+    mut hunter_query: Query<(Entity, &Transform, &Pawn, &CurrentBehavior, &mut HuntSoloAI, &mut Endurance, Option<&PawnTarget>), With<Pawn>>,
     mut prey_query: Query<(Entity, &Transform, &Pawn, &mut Health), (With<Pawn>, Without<HuntSoloAI>)>,
 ) {
-    for (hunter_entity, hunter_transform, hunter_pawn, current_behavior, mut hunt_ai, mut hunter_endurance) in hunter_query.iter_mut() {
+    for (hunter_entity, hunter_transform, hunter_pawn, current_behavior, mut hunt_ai, mut hunter_endurance, current_target) in hunter_query.iter_mut() {
         // Only process if in hunt_solo behavior state
         if let Some(behavior_config) = pawn_config.get_behaviour_config(&hunter_pawn.pawn_type, &current_behavior.state) {
             if !matches!(behavior_config, crate::systems::pawn_config::BehaviourConfig::Simple(crate::systems::pawn_config::BehaviourType::HuntSolo)) {
@@ -191,14 +191,25 @@ pub fn hunt_solo_ai_system(
                     }
                     continue; // Don't move if attacking
                 } else {
-                    // Move towards target
-                    let current_pos = (hunter_transform.translation.x, hunter_transform.translation.y);
-                    let target_pos = (target_transform.translation.x, target_transform.translation.y);
-                    
-                    if let Some(path) = terrain_map.find_path(current_pos, target_pos) {
-                        let mut pawn_target = PawnTarget::new(Vec3::new(target_pos.0, target_pos.1, 100.0));
-                        pawn_target.set_path(path);
-                        commands.entity(hunter_entity).insert(pawn_target);
+                    // Move towards target - only create new path if hunter doesn't have one
+                    let needs_new_path = match current_target {
+                        Some(pawn_target) => {
+                            // Check if we need a new path (target position changed or path is empty)
+                            let target_pos_vec = Vec3::new(target_transform.translation.x, target_transform.translation.y, 100.0);
+                            pawn_target.target_position.distance(target_pos_vec) > 5.0 || pawn_target.path.is_empty()
+                        },
+                        None => true, // No current target, need new path
+                    };
+
+                    if needs_new_path {
+                        let current_pos = (hunter_transform.translation.x, hunter_transform.translation.y);
+                        let target_pos = (target_transform.translation.x, target_transform.translation.y);
+                        
+                        if let Some(path) = terrain_map.find_path(current_pos, target_pos) {
+                            let mut pawn_target = PawnTarget::new(Vec3::new(target_pos.0, target_pos.1, 100.0));
+                            pawn_target.set_path(path);
+                            commands.entity(hunter_entity).insert(pawn_target);
+                        }
                     }
                     continue;
                 }
