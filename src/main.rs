@@ -16,7 +16,7 @@ use systems::spawn::spawn_all_pawns;
 use systems::input::handle_player_input;
 use systems::pawn::{move_pawn_to_target, endurance_health_loss_system, pawn_death_system, endurance_behavior_switching_system, TilesetManager};
 use systems::pawn_config::PawnConfig;
-use systems::ai::{wandering_ai_system, setup_wandering_ai};
+use systems::ai::{wandering_ai_system, setup_wandering_ai, hunt_solo_ai_system, setup_hunt_solo_ai};
 use systems::water_shader::WaterShaderPlugin;
 
 fn main() {
@@ -52,6 +52,8 @@ fn main() {
             move_pawn_to_target,
             setup_wandering_ai,
             wandering_ai_system,
+            setup_hunt_solo_ai,
+            hunt_solo_ai_system,
             endurance_health_loss_system,
             endurance_behavior_switching_system.after(endurance_health_loss_system),
             pawn_death_system,

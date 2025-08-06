@@ -46,9 +46,14 @@ pub struct PawnEats {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PawnDefinition {
     pub sprite: String,
+    pub tags: Vec<String>,
     pub move_speed: f32,
     pub max_health: u32,
     pub max_endurance: u32,
+    pub strength: u32,
+    pub defence: u32,
+    pub attack_speed: f32,
+    pub reach: u32,
     pub spawn_count: u32,
     pub behaviours: PawnBehaviours,
     pub eats: PawnEats,
@@ -102,5 +107,27 @@ impl PawnConfig {
         } else {
             false
         }
+    }
+
+    pub fn can_eat_by_tags(&self, predator_type: &PawnType, prey_type: &PawnType) -> bool {
+        let predator_def = match self.get_pawn_definition(predator_type) {
+            Some(def) => def,
+            None => return false,
+        };
+        
+        let prey_def = match self.get_pawn_definition(prey_type) {
+            Some(def) => def,
+            None => return false,
+        };
+
+        // Check if prey has all the tags that predator eats
+        // If predator eats nothing, it can't eat anything
+        if predator_def.eats.pawns.is_empty() {
+            return false;
+        }
+        
+        predator_def.eats.pawns.iter().all(|required_tag| {
+            prey_def.tags.contains(required_tag)
+        })
     }
 }

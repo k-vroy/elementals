@@ -1,9 +1,18 @@
 player:
   sprite: "tileset::pawns::player"
+  tags:
+    - medium 
+    - animal
+    - sentient
+    - omnivore
   move_speed: 150.0
   max_health: 80
   max_endurance: 150
+  defence: 0
+  strength: 10
+  attack_speed: 1 
   spawn_count: 1
+  reach: 1
   behaviours:
     idle: null
     looking_for_food: null
@@ -14,9 +23,17 @@ player:
 
 rabbit:
   sprite: "tileset::pawns::rabbit"
+  tags:
+    - small 
+    - animal
+    - herbivore
   move_speed: 100.0
   max_health: 25
   max_endurance: 10
+  defence: 5
+  strength: 5
+  attack_speed: 3 
+  reach: 1
   spawn_count: 5
   behaviours:
     idle:
@@ -31,17 +48,25 @@ rabbit:
 
 wolf:
   sprite: "tileset::pawns::wolf"
+  tags:
+    - medium 
+    - animal
+    - carnivore
   move_speed: 120.0
   max_health: 110
-  max_endurance: 60
-  spawn_count: 3
+  max_endurance: 10
+  defence: 10
+  strength: 30
+  attack_speed: 3 
+  reach: 1
+  spawn_count: 1
   behaviours:
     idle:
       wandering:
         move_interval_min: 3.0
         move_interval_max: 8.0
-        move_range: 1
+        move_range: 10
     hunted: null
     looking_for_food: hunt_solo
   eats:
-    pawns: [rabbit]
+    pawns: [small, animal]

@@ -18,3 +18,5 @@ game:
   window_title: "Elementals RPG"
   target_fps: 60
   show_fps: true
+  endurance_cost_per_cell: 1.0
+  health_loss_interval: 5.0

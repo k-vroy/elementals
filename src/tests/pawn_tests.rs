@@ -10,13 +10,19 @@ mod tests {
         let mut pawns = std::collections::HashMap::new();
         pawns.insert("test_pawn".to_string(), PawnDefinition {
             sprite: "test.png".to_string(),
+            tags: vec!["test".to_string()],
             move_speed: 100.0,
             max_health: 50,
             max_endurance: 30,
+            strength: 10,
+            defence: 5,
+            attack_speed: 1.0,
+            reach: 1,
             spawn_count: 1,
             behaviours: PawnBehaviours {
                 idle: None,
                 hunted: None,
+                looking_for_food: None,
                 eat: None,
                 controlled: None,
                 flee: None,
@@ -39,7 +45,7 @@ mod tests {
             window_title: "Test".to_string(),
             target_fps: 60,
             show_fps: false,
-            endurance_cost_per_cell: 0.1,
+            endurance_cost_per_cell: 1.0,
             health_loss_interval: 5.0,
         }
     }
@@ -178,9 +184,9 @@ mod tests {
         
         // Test endurance cost calculation
         let cells_moved = 2.0; // 2 cells
-        let expected_cost = cells_moved * config.endurance_cost_per_cell; // 2.0 * 0.1 = 0.2
+        let expected_cost = cells_moved * config.endurance_cost_per_cell; // 2.0 * 1.0 = 2.0
         
-        assert_eq!(expected_cost, 0.2);
+        assert_eq!(expected_cost, 2.0);
     }
 
     #[test]
