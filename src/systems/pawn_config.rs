@@ -32,6 +32,7 @@ pub enum BehaviourConfig {
 pub struct PawnBehaviours {
     pub idle: Option<BehaviourConfig>,
     pub hunted: Option<BehaviourConfig>,
+    pub looking_for_food: Option<BehaviourConfig>,
     pub eat: Option<BehaviourConfig>,
     pub controlled: Option<BehaviourConfig>,
     pub flee: Option<BehaviourConfig>,
@@ -79,6 +80,7 @@ impl PawnConfig {
         match state {
             "idle" => def.behaviours.idle.as_ref(),
             "hunted" => def.behaviours.hunted.as_ref(),
+            "looking_for_food" => def.behaviours.looking_for_food.as_ref(),
             "eat" => def.behaviours.eat.as_ref(),
             "controlled" => def.behaviours.controlled.as_ref(),
             "flee" => def.behaviours.flee.as_ref(),

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::systems::world_gen::TerrainMap;
-use crate::systems::pawn_config::{PawnConfig, PawnType};
+use crate::systems::pawn_config::{PawnConfig, PawnType, BehaviourConfig, BehaviourType};
 use crate::resources::GameConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -74,6 +74,11 @@ impl TilesetManager {
 #[derive(Component)]
 pub struct Pawn {
     pub pawn_type: PawnType,
+}
+
+#[derive(Component)]
+pub struct CurrentBehavior {
+    pub state: String,
 }
 
 #[derive(Component)]
@@ -244,6 +249,7 @@ pub fn spawn_pawn(
         pawn,
         Health::new(pawn_def.max_health),
         Endurance::new(pawn_def.max_endurance),
+        CurrentBehavior { state: "idle".to_string() },
     )).id()
 }
 
@@ -325,6 +331,33 @@ pub fn pawn_death_system(
         if health.current <= 0.0 {
             println!("{} has died!", pawn.pawn_type);
             commands.entity(entity).despawn();
+        }
+    }
+}
+
+pub fn endurance_behavior_switching_system(
+    pawn_config: Res<PawnConfig>,
+    mut pawn_query: Query<(&Pawn, &Endurance, &mut CurrentBehavior)>,
+) {
+    for (pawn, endurance, mut current_behavior) in pawn_query.iter_mut() {
+        let endurance_percentage = endurance.current / endurance.max;
+        
+        // Switch to looking_for_food when endurance is 30% or below
+        if endurance_percentage <= 0.3 && current_behavior.state != "looking_for_food" {
+            // Check if this pawn has a looking_for_food behavior defined
+            if let Some(behavior_config) = pawn_config.get_behaviour_config(&pawn.pawn_type, "looking_for_food") {
+                if !matches!(behavior_config, BehaviourConfig::Simple(BehaviourType::Null)) {
+                    println!("{} switching to looking_for_food behavior (endurance: {:.1}%)", 
+                             pawn.pawn_type, endurance_percentage * 100.0);
+                    current_behavior.state = "looking_for_food".to_string();
+                }
+            }
+        }
+        // Switch back to idle when endurance is above 50% (hysteresis to prevent flapping)
+        else if endurance_percentage > 0.5 && current_behavior.state == "looking_for_food" {
+            println!("{} switching back to idle behavior (endurance: {:.1}%)", 
+                     pawn.pawn_type, endurance_percentage * 100.0);
+            current_behavior.state = "idle".to_string();
         }
     }
 }

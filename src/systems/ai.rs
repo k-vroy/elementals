@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use rand::prelude::*;
-use crate::systems::pawn::{Pawn, PawnTarget};
+use crate::systems::pawn::{Pawn, PawnTarget, CurrentBehavior};
 use crate::systems::pawn_config::PawnConfig;
 use crate::systems::world_gen::TerrainMap;
 use crate::resources::GameConfig;
@@ -30,15 +30,15 @@ pub fn wandering_ai_system(
     pawn_config: Res<PawnConfig>,
     config: Res<GameConfig>,
     mut commands: Commands,
-    mut wandering_query: Query<(Entity, &Transform, &Pawn, &mut WanderingAI), With<Pawn>>,
+    mut wandering_query: Query<(Entity, &Transform, &Pawn, &CurrentBehavior, &mut WanderingAI), With<Pawn>>,
 ) {
     let mut rng = rand::thread_rng();
     
-    for (entity, transform, pawn, mut ai) in wandering_query.iter_mut() {
-        // Get wandering config for this pawn's idle behavior
-        let wandering_config = match pawn_config.get_wandering_config(&pawn.pawn_type, "idle") {
+    for (entity, transform, pawn, current_behavior, mut ai) in wandering_query.iter_mut() {
+        // Get wandering config for this pawn's current behavior
+        let wandering_config = match pawn_config.get_wandering_config(&pawn.pawn_type, &current_behavior.state) {
             Some(config) => config,
-            None => continue, // Skip pawns without wandering behavior
+            None => continue, // Skip pawns without wandering behavior for current state
         };
 
         // Update timer
@@ -86,11 +86,11 @@ pub fn wandering_ai_system(
 pub fn setup_wandering_ai(
     mut commands: Commands,
     pawn_config: Res<PawnConfig>,
-    wandering_query: Query<(Entity, &Pawn), (With<Pawn>, Without<WanderingAI>)>,
+    wandering_query: Query<(Entity, &Pawn, &CurrentBehavior), (With<Pawn>, Without<WanderingAI>)>,
 ) {
-    for (entity, pawn) in wandering_query.iter() {
-        // Check if this pawn has wandering behavior configured
-        if let Some(wandering_config) = pawn_config.get_wandering_config(&pawn.pawn_type, "idle") {
+    for (entity, pawn, current_behavior) in wandering_query.iter() {
+        // Check if this pawn has wandering behavior configured for its current state
+        if let Some(wandering_config) = pawn_config.get_wandering_config(&pawn.pawn_type, &current_behavior.state) {
             let mut ai = WanderingAI::new();
             ai.schedule_next_move(wandering_config.move_interval_min, wandering_config.move_interval_max);
             commands.entity(entity).insert(ai);
