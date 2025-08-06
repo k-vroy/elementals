@@ -14,7 +14,7 @@ use systems::camera::{CameraController, MouseDragState, camera_movement, camera_
 use systems::fps_counter::{setup_fps_counter, update_fps_counter};
 use systems::spawn::spawn_all_pawns;
 use systems::input::handle_player_input;
-use systems::pawn::{move_pawn_to_target, endurance_health_loss_system, pawn_death_system};
+use systems::pawn::{move_pawn_to_target, endurance_health_loss_system, pawn_death_system, TilesetManager};
 use systems::pawn_config::PawnConfig;
 use systems::ai::{wandering_ai_system, setup_wandering_ai};
 use systems::water_shader::WaterShaderPlugin;
@@ -37,6 +37,7 @@ fn main() {
         .add_plugins(bevy_ecs_tilemap::TilemapPlugin)
         .add_plugins(WaterShaderPlugin)
         .insert_resource(MouseDragState::default())
+        .insert_resource(TilesetManager::default())
         .insert_resource(pawn_config)
         .add_systems(Startup, (
             setup_camera,

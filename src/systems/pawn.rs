@@ -2,6 +2,74 @@ use bevy::prelude::*;
 use crate::systems::world_gen::TerrainMap;
 use crate::systems::pawn_config::{PawnConfig, PawnType};
 use crate::resources::GameConfig;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SpriteInfo {
+    name: String,
+    index: u32,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TilesetIndex {
+    tileset_name: String,
+    tile_size: u32,
+    tiles_per_row: u32,
+    total_tiles: u32,
+    sprites: Vec<SpriteInfo>,
+}
+
+#[derive(Resource)]
+pub struct TilesetManager {
+    tilesets: HashMap<String, TilesetIndex>,
+    atlases: HashMap<String, Handle<TextureAtlasLayout>>,
+}
+
+impl Default for TilesetManager {
+    fn default() -> Self {
+        Self {
+            tilesets: HashMap::new(),
+            atlases: HashMap::new(),
+        }
+    }
+}
+
+impl TilesetManager {
+    pub fn load_tileset(&mut self, tileset_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let yaml_path = format!("assets/tilesets/{}.yaml", tileset_name);
+        let yaml_content = std::fs::read_to_string(&yaml_path)?;
+        let tileset_index: TilesetIndex = serde_yaml::from_str(&yaml_content)?;
+        self.tilesets.insert(tileset_name.to_string(), tileset_index);
+        Ok(())
+    }
+    
+    pub fn get_sprite_index(&self, tileset_name: &str, sprite_name: &str) -> Option<u32> {
+        self.tilesets.get(tileset_name)?
+            .sprites.iter()
+            .find(|sprite| sprite.name == sprite_name)
+            .map(|sprite| sprite.index)
+    }
+    
+    pub fn create_atlas_layout(&self, tileset_name: &str, texture_atlas_layouts: &mut Assets<TextureAtlasLayout>) -> Option<Handle<TextureAtlasLayout>> {
+        let tileset = self.tilesets.get(tileset_name)?;
+        
+        // Create atlas layout based on tileset configuration
+        let layout = TextureAtlasLayout::from_grid(
+            UVec2::new(tileset.tile_size, tileset.tile_size),
+            tileset.tiles_per_row,
+            (tileset.total_tiles + tileset.tiles_per_row - 1) / tileset.tiles_per_row,
+            None,
+            None
+        );
+        
+        Some(texture_atlas_layouts.add(layout))
+    }
+}
 
 #[derive(Component)]
 pub struct Pawn {
@@ -99,6 +167,8 @@ pub fn spawn_pawn(
     asset_server: &Res<AssetServer>,
     terrain_map: &Res<TerrainMap>,
     pawn_config: &Res<PawnConfig>,
+    tileset_manager: &mut ResMut<TilesetManager>,
+    texture_atlas_layouts: &mut ResMut<Assets<TextureAtlasLayout>>,
     pawn: Pawn,
     spawn_position: Option<(f32, f32)>,
 ) -> Entity {
@@ -117,8 +187,59 @@ pub fn spawn_pawn(
     let pawn_def = pawn_config.get_pawn_definition(&pawn.pawn_type)
         .expect("Pawn definition not found in config");
 
+    // Parse sprite reference - check if it's a tileset reference or direct file
+    let sprite_bundle = if pawn_def.sprite.starts_with("tileset::") {
+        // Parse tileset reference: "tileset::tileset_name::sprite_name"
+        let parts: Vec<&str> = pawn_def.sprite.split("::").collect();
+        if parts.len() == 3 && parts[0] == "tileset" {
+            let tileset_name = parts[1];
+            let sprite_name = parts[2];
+            
+            // Load tileset if not already loaded
+            if !tileset_manager.tilesets.contains_key(tileset_name) {
+                if let Err(e) = tileset_manager.load_tileset(tileset_name) {
+                    eprintln!("Failed to load tileset {}: {}", tileset_name, e);
+                    // Fallback to direct sprite loading
+                    Sprite::from_image(asset_server.load(&pawn_def.sprite))
+                } else {
+                    // Create sprite with atlas
+                    let texture_handle = asset_server.load(format!("tilesets/{}.png", tileset_name));
+                    let atlas_layout = tileset_manager.create_atlas_layout(tileset_name, texture_atlas_layouts)
+                        .expect("Failed to create atlas layout");
+                    
+                    let sprite_index = tileset_manager.get_sprite_index(tileset_name, sprite_name)
+                        .unwrap_or(0);
+                    
+                    Sprite::from_atlas_image(texture_handle, TextureAtlas {
+                        layout: atlas_layout,
+                        index: sprite_index as usize,
+                    })
+                }
+            } else {
+                // Tileset already loaded, just get the sprite
+                let texture_handle = asset_server.load(format!("tilesets/{}.png", tileset_name));
+                let atlas_layout = tileset_manager.create_atlas_layout(tileset_name, texture_atlas_layouts)
+                    .expect("Failed to create atlas layout");
+                
+                let sprite_index = tileset_manager.get_sprite_index(tileset_name, sprite_name)
+                    .unwrap_or(0);
+                
+                Sprite::from_atlas_image(texture_handle, TextureAtlas {
+                    layout: atlas_layout,
+                    index: sprite_index as usize,
+                })
+            }
+        } else {
+            // Invalid tileset format, fallback to direct loading
+            Sprite::from_image(asset_server.load(&pawn_def.sprite))
+        }
+    } else {
+        // Direct sprite file
+        Sprite::from_image(asset_server.load(&pawn_def.sprite))
+    };
+
     commands.spawn((
-        Sprite::from_image(asset_server.load(&pawn_def.sprite)),
+        sprite_bundle,
         Transform::from_translation(Vec3::new(position.0, position.1, 100.0)),
         pawn,
         Health::new(pawn_def.max_health),

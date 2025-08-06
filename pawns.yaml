@@ -1,5 +1,5 @@
 player:
-  sprite: "player.png"
+  sprite: "tileset::pawns::player"
   move_speed: 150.0
   max_health: 80
   max_endurance: 150
