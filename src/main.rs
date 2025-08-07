@@ -9,7 +9,7 @@ mod resources;
 mod tests;
 
 use resources::GameConfig;
-use systems::world_gen::generate_world;
+use systems::world_gen::{generate_world, TerrainChanges, update_terrain_visuals};
 use systems::camera::{CameraController, MouseDragState, camera_movement, camera_zoom, mouse_camera_pan};
 use systems::fps_counter::{setup_fps_counter, update_fps_counter};
 use systems::spawn::spawn_all_pawns;
@@ -40,6 +40,7 @@ fn main() {
         .insert_resource(MouseDragState::default())
         .insert_resource(TilesetManager::default())
         .insert_resource(DebugDisplayState::default())
+        .insert_resource(TerrainChanges::default())
         .insert_resource(pawn_config)
         .add_systems(Startup, (
             setup_camera,
@@ -66,6 +67,7 @@ fn main() {
             manage_waypoint_lines,
             update_waypoint_lines.after(manage_waypoint_lines),
             cleanup_orphaned_waypoint_lines.after(move_pawn_to_target),
+            update_terrain_visuals,
         ));
 
     // Conditionally add FPS counter based on settings

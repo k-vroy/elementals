@@ -135,6 +135,17 @@ impl TerrainMap {
         None // No passable tile found within reasonable distance
     }
 
+    pub fn set_tile_at_world_pos(&mut self, world_x: f32, world_y: f32, terrain_type: TerrainType, terrain_changes: &mut TerrainChanges) -> bool {
+        if let Some((tile_x, tile_y)) = self.world_to_tile_coords(world_x, world_y) {
+            if tile_x >= 0 && tile_x < self.width as i32 && tile_y >= 0 && tile_y < self.height as i32 {
+                self.tiles[tile_x as usize][tile_y as usize] = terrain_type;
+                terrain_changes.add_change(tile_x as u32, tile_y as u32, terrain_type);
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn find_path(&self, start_world: (f32, f32), goal_world: (f32, f32)) -> Option<Vec<(f32, f32)>> {
         // Convert world coordinates to tile coordinates
         let start_tile = self.world_to_tile_coords(start_world.0, start_world.1)?;
@@ -190,6 +201,21 @@ impl TerrainMap {
         } else {
             None // No path found
         }
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct TerrainChanges {
+    pub changed_tiles: Vec<(u32, u32, TerrainType)>, // (x, y, new_terrain_type)
+}
+
+impl TerrainChanges {
+    pub fn add_change(&mut self, x: u32, y: u32, terrain_type: TerrainType) {
+        self.changed_tiles.push((x, y, terrain_type));
+    }
+    
+    pub fn clear(&mut self) {
+        self.changed_tiles.clear();
     }
 }
 
@@ -448,4 +474,29 @@ fn generate_decoration_layer(
         layer_id: 2,
         z_index: 2.0,
     });
+}
+
+pub fn update_terrain_visuals(
+    mut terrain_changes: ResMut<TerrainChanges>,
+    mut tile_query: Query<&mut TileTextureIndex>,
+    tile_storage_query: Query<&TileStorage, With<TerrainLayer>>,
+) {
+    if terrain_changes.changed_tiles.is_empty() {
+        return;
+    }
+    
+    // Find the terrain layer tile storage
+    if let Ok(tile_storage) = tile_storage_query.get_single() {
+        for (x, y, terrain_type) in terrain_changes.changed_tiles.drain(..) {
+            let tile_pos = TilePos { x, y };
+            
+            if let Some(tile_entity) = tile_storage.get(&tile_pos) {
+                if let Ok(mut texture_index) = tile_query.get_mut(tile_entity) {
+                    texture_index.0 = terrain_type as u32;
+                }
+            }
+        }
+    }
+    
+    terrain_changes.clear();
 }

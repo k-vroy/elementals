@@ -1,14 +1,17 @@
 use bevy::prelude::*;
 use crate::resources::GameConfig;
-use crate::systems::world_gen::TerrainMap;
+use crate::systems::world_gen::{TerrainMap, TerrainType, TerrainChanges};
 use crate::systems::pawn::{Pawn, PawnTarget};
+use crate::systems::debug_display::DebugDisplayState;
 
 pub fn handle_player_input(
     mouse_input: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera>>,
     config: Res<GameConfig>,
-    terrain_map: Res<TerrainMap>,
+    mut terrain_map: ResMut<TerrainMap>,
+    mut terrain_changes: ResMut<TerrainChanges>,
+    debug_state: Res<DebugDisplayState>,
     mut commands: Commands,
     player_query: Query<(Entity, &Transform, &Pawn), With<Pawn>>,
 ) {
@@ -50,6 +53,34 @@ pub fn handle_player_input(
                                 } else {
                                     println!("No path found to {:?}", target_pos);
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Debug terrain editing with middle mouse click
+    if mouse_input.just_pressed(MouseButton::Middle) && debug_state.enabled {
+        if let Ok(window) = windows.get_single() {
+            if let Some(cursor_position) = window.cursor_position() {
+                if let Ok((camera, camera_transform)) = camera_query.get_single() {
+                    // Convert screen coordinates to world coordinates
+                    if let Ok(world_position) = camera.viewport_to_world_2d(camera_transform, cursor_position) {
+                        // Check if current tile is passable and toggle between stone and dirt
+                        let current_terrain = terrain_map.get_terrain_at_world_pos(world_position.x, world_position.y);
+                        
+                        if let Some(terrain_type) = current_terrain {
+                            let new_terrain = if terrain_type.is_passable() {
+                                TerrainType::Stone // Set to stone if currently passable
+                            } else {
+                                TerrainType::Dirt  // Set to dirt if currently impassable
+                            };
+                            
+                            if terrain_map.set_tile_at_world_pos(world_position.x, world_position.y, new_terrain, &mut terrain_changes) {
+                                println!("Debug: Changed tile at ({:.1}, {:.1}) from {:?} to {:?}", 
+                                    world_position.x, world_position.y, terrain_type, new_terrain);
                             }
                         }
                     }
