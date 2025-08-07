@@ -149,23 +149,33 @@ impl TerrainMap {
         let result = astar(
             &start_tile,
             |&(x, y)| {
-                // Generate neighbors (4-directional movement)
+                // Generate neighbors (8-directional movement with diagonal support)
                 let neighbors = vec![
                     (x + 1, y),     // Right
                     (x - 1, y),     // Left
                     (x, y + 1),     // Up
                     (x, y - 1),     // Down
+                    (x + 1, y + 1), // Up-Right (diagonal)
+                    (x + 1, y - 1), // Down-Right (diagonal)
+                    (x - 1, y + 1), // Up-Left (diagonal)
+                    (x - 1, y - 1), // Down-Left (diagonal)
                 ];
                 
                 neighbors
                     .into_iter()
                     .filter(|&(nx, ny)| self.is_tile_passable(nx, ny))
-                    .map(|pos| (pos, 1)) // All moves have cost 1
+                    .map(|pos| {
+                        // Diagonal moves cost more (approximately sqrt(2) ≈ 1.414)
+                        let cost = if pos.0 != x && pos.1 != y { 14 } else { 10 };
+                        (pos, cost)
+                    })
                     .collect::<Vec<_>>()
             },
             |&(x, y)| {
-                // Heuristic: Manhattan distance to goal
-                ((x - goal_tile.0).abs() + (y - goal_tile.1).abs()) as u32
+                // Heuristic: Diagonal distance (Chebyshev distance) for 8-directional movement
+                let dx = (x - goal_tile.0).abs();
+                let dy = (y - goal_tile.1).abs();
+                (dx.max(dy) * 10 + (dx.min(dy) * 4)) as u32 // 10 for straight, 14 for diagonal
             },
             |&pos| pos == goal_tile,
         );
