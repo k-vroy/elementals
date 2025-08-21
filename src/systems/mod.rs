@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod async_pathfinding;
 pub mod camera;
 pub mod debug_display;
 pub mod fps_counter;

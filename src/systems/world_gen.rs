@@ -25,7 +25,7 @@ impl TerrainType {
     }
 }
 
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct TerrainMap {
     pub width: u32,
     pub height: u32,

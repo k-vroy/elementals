@@ -3,6 +3,7 @@ use rand::prelude::*;
 use crate::systems::pawn::{Pawn, PawnTarget, CurrentBehavior, Health, Endurance, Size};
 use crate::systems::pawn_config::PawnConfig;
 use crate::systems::world_gen::TerrainMap;
+use crate::systems::async_pathfinding::{PathfindingRequest, PathfindingPriority, request_pathfinding};
 use crate::resources::GameConfig;
 
 #[derive(Component)]
@@ -47,7 +48,7 @@ pub fn wandering_ai_system(
     pawn_config: Res<PawnConfig>,
     config: Res<GameConfig>,
     mut commands: Commands,
-    mut wandering_query: Query<(Entity, &Transform, &Pawn, &Size, &CurrentBehavior, &mut WanderingAI), With<Pawn>>,
+    mut wandering_query: Query<(Entity, &Transform, &Pawn, &Size, &CurrentBehavior, &mut WanderingAI), (With<Pawn>, Without<PawnTarget>, Without<PathfindingRequest>)>,
 ) {
     let mut rng = rand::thread_rng();
     
@@ -81,14 +82,10 @@ pub fn wandering_ai_system(
                 let target_y = current_pos.1 + angle.sin() * distance;
                 let target_pos = (target_x, target_y);
                 
-                // Check if target is passable and find a path
-                if let Some(path) = terrain_map.find_path_for_size(current_pos, target_pos, size.value) {
-                    // Create target and set path
-                    let mut pawn_target = PawnTarget::new(Vec3::new(target_x, target_y, 100.0));
-                    pawn_target.set_path(path);
-                    
-                    // Add target component to wolf
-                    commands.entity(entity).insert(pawn_target);
+                // Check if target is potentially passable (quick check)
+                if terrain_map.is_position_passable_for_size(target_pos.0, target_pos.1, size.value) {
+                    // Request async pathfinding
+                    request_pathfinding(&mut commands, entity, current_pos, target_pos, size.value);
                     break;
                 }
             }
@@ -133,11 +130,10 @@ pub fn setup_hunt_solo_ai(
 
 pub fn hunt_solo_ai_system(
     time: Res<Time>,
-    terrain_map: Res<TerrainMap>,
     pawn_config: Res<PawnConfig>,
     config: Res<GameConfig>,
     mut commands: Commands,
-    mut hunter_query: Query<(Entity, &Transform, &Pawn, &Size, &CurrentBehavior, &mut HuntSoloAI, &mut Endurance, Option<&PawnTarget>), With<Pawn>>,
+    mut hunter_query: Query<(Entity, &Transform, &Pawn, &Size, &CurrentBehavior, &mut HuntSoloAI, &mut Endurance, Option<&PawnTarget>), (With<Pawn>, Without<PathfindingRequest>)>,
     mut prey_query: Query<(Entity, &Transform, &Pawn, &mut Health), (With<Pawn>, Without<HuntSoloAI>)>,
 ) {
     for (hunter_entity, hunter_transform, hunter_pawn, hunter_size, current_behavior, mut hunt_ai, mut hunter_endurance, current_target) in hunter_query.iter_mut() {
@@ -205,11 +201,11 @@ pub fn hunt_solo_ai_system(
                         let current_pos = (hunter_transform.translation.x, hunter_transform.translation.y);
                         let target_pos = (target_transform.translation.x, target_transform.translation.y);
                         
-                        if let Some(path) = terrain_map.find_path_for_size(current_pos, target_pos, hunter_size.value) {
-                            let mut pawn_target = PawnTarget::new(Vec3::new(target_pos.0, target_pos.1, 100.0));
-                            pawn_target.set_path(path);
-                            commands.entity(hunter_entity).insert(pawn_target);
-                        }
+                        // Request high-priority async pathfinding for hunting
+                        commands.entity(hunter_entity).insert(
+                            PathfindingRequest::new(current_pos, target_pos, hunter_size.value)
+                                .with_priority(PathfindingPriority::High)
+                        );
                     }
                     continue;
                 }

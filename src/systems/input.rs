@@ -1,8 +1,9 @@
 use bevy::prelude::*;
 use crate::resources::GameConfig;
 use crate::systems::world_gen::{TerrainMap, TerrainType, TerrainChanges};
-use crate::systems::pawn::{Pawn, PawnTarget, Size};
+use crate::systems::pawn::{Pawn, Size};
 use crate::systems::debug_display::DebugDisplayState;
+use crate::systems::async_pathfinding::{PathfindingRequest, PathfindingPriority};
 
 pub fn handle_player_input(
     mouse_input: Res<ButtonInput<MouseButton>>,
@@ -42,17 +43,13 @@ pub fn handle_player_input(
                                 let player_pos = (transform.translation.x, transform.translation.y);
                                 let goal_pos = (snapped_x, snapped_y);
 
-                                if let Some(path) = terrain_map.find_path_for_size(player_pos, goal_pos, size.value) {
-                                    let mut pawn_target = PawnTarget::new(target_pos);
-                                    pawn_target.set_path(path.clone());
-                                    
-                                    // Add or update the PawnTarget component
-                                    commands.entity(entity).insert(pawn_target);
-                                    
-                                    println!("Path found to {:?} with {} waypoints", target_pos, path.len());
-                                } else {
-                                    println!("No path found to {:?}", target_pos);
-                                }
+                                // Request critical priority pathfinding for player input
+                                commands.entity(entity).insert(
+                                    PathfindingRequest::new(player_pos, goal_pos, size.value)
+                                        .with_priority(PathfindingPriority::Critical)
+                                );
+                                
+                                println!("Pathfinding requested to {:?}", target_pos);
                             }
                         }
                     }

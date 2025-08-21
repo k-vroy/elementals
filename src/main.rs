@@ -17,6 +17,10 @@ use systems::input::handle_player_input;
 use systems::pawn::{move_pawn_to_target, endurance_health_loss_system, pawn_death_system, endurance_behavior_switching_system, TilesetManager};
 use systems::pawn_config::PawnConfig;
 use systems::ai::{wandering_ai_system, setup_wandering_ai, hunt_solo_ai_system, setup_hunt_solo_ai};
+use systems::async_pathfinding::{
+    spawn_cached_pathfinding_tasks, handle_completed_cached_pathfinding, 
+    cleanup_stale_pathfinding, PathfindingRequestCounter, GlobalPathfindingCache
+};
 use systems::debug_display::{DebugDisplayState, toggle_debug_display, manage_debug_text_entities, update_debug_text, cleanup_orphaned_debug_text, manage_waypoint_lines, update_waypoint_lines, cleanup_orphaned_waypoint_lines};
 use systems::water_shader::WaterShaderPlugin;
 
@@ -41,6 +45,8 @@ fn main() {
         .insert_resource(TilesetManager::default())
         .insert_resource(DebugDisplayState::default())
         .insert_resource(TerrainChanges::default())
+        .insert_resource(PathfindingRequestCounter::default())
+        .insert_resource(GlobalPathfindingCache::default())
         .insert_resource(pawn_config)
         .add_systems(Startup, (
             setup_camera,
@@ -48,11 +54,21 @@ fn main() {
             spawn_all_pawns.after(generate_world),
         ))
         .add_systems(Update, (
+            // Input and camera
             camera_movement, 
             camera_zoom, 
             mouse_camera_pan,
             handle_player_input,
             toggle_debug_display,
+        ))
+        .add_systems(Update, (
+            // Async pathfinding systems - run early in frame
+            spawn_cached_pathfinding_tasks,
+            handle_completed_cached_pathfinding,
+            cleanup_stale_pathfinding,
+        ))
+        .add_systems(Update, (
+            // Movement and AI systems
             move_pawn_to_target,
             setup_wandering_ai,
             wandering_ai_system,
@@ -61,13 +77,16 @@ fn main() {
             endurance_health_loss_system,
             endurance_behavior_switching_system.after(endurance_health_loss_system),
             pawn_death_system,
+            update_terrain_visuals,
+        ))
+        .add_systems(Update, (
+            // Debug and UI systems
             manage_debug_text_entities,
             update_debug_text.after(manage_debug_text_entities),
             cleanup_orphaned_debug_text.after(pawn_death_system),
             manage_waypoint_lines,
             update_waypoint_lines.after(manage_waypoint_lines),
             cleanup_orphaned_waypoint_lines.after(move_pawn_to_target),
-            update_terrain_visuals,
         ));
 
     // Conditionally add FPS counter based on settings
