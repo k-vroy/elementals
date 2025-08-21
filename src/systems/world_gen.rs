@@ -185,7 +185,7 @@ impl TerrainMap {
                 
                 // Use a more generous tolerance to allow access to adjacent tiles
                 // Allow pawns to get close to impassable tiles as long as they don't significantly overlap
-                let tolerance = self.tile_size; // 25% tolerance for better playability
+                let tolerance = self.tile_size * 0.25; // 25% tolerance for better playability
                 
                 // Check if pawn's radius overlaps with this impassable tile (with tolerance)
                 if distance < radius - tolerance {
@@ -254,6 +254,51 @@ impl TerrainMap {
         }
     }
 
+    fn is_path_segment_clear(&self, from_world: (f32, f32), to_world: (f32, f32), size: f32) -> bool {
+        // Sample points along the path to ensure the entire segment is clear
+        let dx = to_world.0 - from_world.0;
+        let dy = to_world.1 - from_world.1;
+        let distance = (dx * dx + dy * dy).sqrt();
+        
+        // If it's a very short distance, just check the endpoints
+        if distance < self.tile_size * 0.1 {
+            return self.is_position_passable_for_size(to_world.0, to_world.1, size);
+        }
+        
+        // Sample at intervals smaller than the pawn's radius to ensure coverage
+        let half_tile = self.tile_size / 2.0;
+        let radius = size * half_tile;
+        
+        // For very small pawns, use a minimum sample interval to avoid infinite sampling
+        let min_sample_interval = self.tile_size * 0.25; // Minimum quarter-tile intervals
+        let sample_interval = if radius < min_sample_interval {
+            min_sample_interval
+        } else {
+            radius * 0.5 // Sample at half the radius for good coverage
+        };
+        
+        let num_samples = (distance / sample_interval).ceil() as usize;
+        
+        // Cap the number of samples to prevent excessive computation
+        let num_samples = num_samples.min(50); // Reasonable maximum
+        
+        // Ensure we always check at least the destination
+        let num_samples = if num_samples == 0 { 1 } else { num_samples };
+        
+        // Check each sample point along the path
+        for i in 0..=num_samples {
+            let t = if num_samples == 0 { 1.0 } else { i as f32 / num_samples as f32 };
+            let sample_x = from_world.0 + dx * t;
+            let sample_y = from_world.1 + dy * t;
+            
+            if !self.is_position_passable_for_size(sample_x, sample_y, size) {
+                return false;
+            }
+        }
+        
+        true
+    }
+
     pub fn find_path_for_size(&self, start_world: (f32, f32), goal_world: (f32, f32), size: f32) -> Option<Vec<(f32, f32)>> {
         // Convert world coordinates to tile coordinates
         let start_tile = self.world_to_tile_coords(start_world.0, start_world.1)?;
@@ -288,9 +333,15 @@ impl TerrainMap {
                 neighbors
                     .into_iter()
                     .filter(|&(nx, ny)| {
-                        // Check if this position is passable for the given size
-                        let world_pos = self.tile_to_world_coords(nx, ny);
-                        self.is_position_passable_for_size(world_pos.0, world_pos.1, size)
+                        // Check if destination position is passable for the given size
+                        let to_world = self.tile_to_world_coords(nx, ny);
+                        if !self.is_position_passable_for_size(to_world.0, to_world.1, size) {
+                            return false;
+                        }
+                        
+                        // Check if the entire path segment from current position to neighbor is clear
+                        let from_world = self.tile_to_world_coords(x, y);
+                        self.is_path_segment_clear(from_world, to_world, size)
                     })
                     .map(|pos| {
                         // Diagonal moves cost more (approximately sqrt(2) ≈ 1.414)

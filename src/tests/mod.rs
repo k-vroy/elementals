@@ -4,6 +4,7 @@ pub mod pawn_tests;
 pub mod hunt_solo_tests;
 pub mod debug_terrain_tests;
 pub mod size_pathfinding_tests;
+pub mod path_segment_regression_tests;
 
 use bevy::prelude::*;
 use crate::systems::world_gen::{TerrainMap, TerrainType};
