@@ -146,6 +146,27 @@ impl TerrainMap {
         false
     }
 
+    fn is_position_passable_for_size_with_cache(&self, world_x: f32, world_y: f32, size: f32, cache: &mut Option<&mut crate::systems::pathfinding_cache::PathfindingCache>) -> bool {
+        if let Some(cache) = cache {
+            // Try cache first
+            if let Some(tile_coords) = self.world_to_tile_coords(world_x, world_y) {
+                if let Some(cached_result) = cache.get_passability(tile_coords.0, tile_coords.1, size) {
+                    return cached_result;
+                }
+                
+                // Not cached, compute and cache
+                let result = self.is_position_passable_for_size(world_x, world_y, size);
+                cache.cache_passability(tile_coords.0, tile_coords.1, size, result);
+                result
+            } else {
+                false
+            }
+        } else {
+            // No cache available, compute directly
+            self.is_position_passable_for_size(world_x, world_y, size)
+        }
+    }
+
     pub fn is_position_passable_for_size(&self, world_x: f32, world_y: f32, size: f32) -> bool {
         // Convert position to tile coordinates
         let center_tile = match self.world_to_tile_coords(world_x, world_y) {
@@ -255,6 +276,10 @@ impl TerrainMap {
     }
 
     fn is_path_segment_clear(&self, from_world: (f32, f32), to_world: (f32, f32), size: f32) -> bool {
+        self.is_path_segment_clear_with_cache(from_world, to_world, size, &mut None)
+    }
+
+    fn is_path_segment_clear_with_cache(&self, from_world: (f32, f32), to_world: (f32, f32), size: f32, cache: &mut Option<&mut crate::systems::pathfinding_cache::PathfindingCache>) -> bool {
         // Sample points along the path to ensure the entire segment is clear
         let dx = to_world.0 - from_world.0;
         let dy = to_world.1 - from_world.1;
@@ -262,7 +287,7 @@ impl TerrainMap {
         
         // If it's a very short distance, just check the endpoints
         if distance < self.tile_size * 0.1 {
-            return self.is_position_passable_for_size(to_world.0, to_world.1, size);
+            return self.is_position_passable_for_size_with_cache(to_world.0, to_world.1, size, cache);
         }
         
         // Sample at intervals smaller than the pawn's radius to ensure coverage
@@ -291,7 +316,7 @@ impl TerrainMap {
             let sample_x = from_world.0 + dx * t;
             let sample_y = from_world.1 + dy * t;
             
-            if !self.is_position_passable_for_size(sample_x, sample_y, size) {
+            if !self.is_position_passable_for_size_with_cache(sample_x, sample_y, size, cache) {
                 return false;
             }
         }
@@ -299,22 +324,48 @@ impl TerrainMap {
         true
     }
 
+    /// Cached version of pathfinding - use this for performance
+    pub fn find_path_for_size_cached(&self, start_world: (f32, f32), goal_world: (f32, f32), size: f32, cache: &mut crate::systems::pathfinding_cache::PathfindingCache) -> Option<Vec<(f32, f32)>> {
+        // Convert world coordinates to tile coordinates
+        let start_tile = self.world_to_tile_coords(start_world.0, start_world.1)?;
+        let goal_tile = self.world_to_tile_coords(goal_world.0, goal_world.1)?;
+
+        // Check cache first
+        if let Some(cached_result) = cache.get_path(start_tile, goal_tile, size) {
+            return cached_result.clone();
+        }
+
+        // Compute path if not cached
+        let result = self.find_path_for_size_internal(start_world, goal_world, size, Some(cache));
+        
+        // Cache the result
+        cache.cache_path(start_tile, goal_tile, size, result.clone(), self);
+        
+        result
+    }
+
+    /// Original pathfinding method (kept for compatibility)
     pub fn find_path_for_size(&self, start_world: (f32, f32), goal_world: (f32, f32), size: f32) -> Option<Vec<(f32, f32)>> {
+        self.find_path_for_size_internal(start_world, goal_world, size, None)
+    }
+
+    fn find_path_for_size_internal(&self, start_world: (f32, f32), goal_world: (f32, f32), size: f32, mut cache: Option<&mut crate::systems::pathfinding_cache::PathfindingCache>) -> Option<Vec<(f32, f32)>> {
         // Convert world coordinates to tile coordinates
         let start_tile = self.world_to_tile_coords(start_world.0, start_world.1)?;
         let goal_tile = self.world_to_tile_coords(goal_world.0, goal_world.1)?;
 
         // Check if start is passable for this size
-        if !self.is_position_passable_for_size(start_world.0, start_world.1, size) {
+        if !self.is_position_passable_for_size_with_cache(start_world.0, start_world.1, size, &mut cache) {
             return None; // Can't start from impassable position
         }
 
         // Check if goal is passable for this size
-        if !self.is_position_passable_for_size(goal_world.0, goal_world.1, size) {
+        if !self.is_position_passable_for_size_with_cache(goal_world.0, goal_world.1, size, &mut cache) {
             return None; // Can't path to position that's impassable for this size
         }
 
-        // A* pathfinding with size awareness
+        // A* pathfinding with size awareness  
+        // Note: We can't pass mutable cache into the closure, so we'll use the uncached version in A*
         let result = astar(
             &start_tile,
             |&(x, y)| {

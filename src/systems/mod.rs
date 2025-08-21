@@ -5,6 +5,7 @@ pub mod fps_counter;
 pub mod input;
 pub mod pawn;
 pub mod pawn_config;
+pub mod pathfinding_cache;
 pub mod spawn;
 pub mod tilemap;
 pub mod water_shader;
