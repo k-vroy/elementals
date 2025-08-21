@@ -263,9 +263,10 @@ pub fn move_pawn_to_target(
     time: Res<Time>,
     pawn_config: Res<PawnConfig>,
     config: Res<GameConfig>,
-    mut pawn_query: Query<(&mut Transform, &mut PawnTarget, &Pawn, &mut Endurance)>,
+    mut commands: Commands,
+    mut pawn_query: Query<(Entity, &mut Transform, &mut PawnTarget, &Pawn, &mut Endurance)>,
 ) {
-    for (mut transform, mut target, pawn, mut endurance) in pawn_query.iter_mut() {
+    for (entity, mut transform, mut target, pawn, mut endurance) in pawn_query.iter_mut() {
         if let Some(current_waypoint) = target.get_current_waypoint() {
             let distance = transform.translation.distance(current_waypoint);
             
@@ -297,7 +298,8 @@ pub fn move_pawn_to_target(
                 
                 if target.is_at_destination() {
                     println!("{} reached destination: {:?}", pawn.pawn_type, target.target_position);
-                    target.reset();
+                    // Remove PawnTarget component so pawn can get new AI targets
+                    commands.entity(entity).remove::<PawnTarget>();
                 } else {
                     target.advance_waypoint();
                 }
