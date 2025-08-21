@@ -77,6 +77,11 @@ pub struct Pawn {
 }
 
 #[derive(Component)]
+pub struct Size {
+    pub value: f32,
+}
+
+#[derive(Component)]
 pub struct CurrentBehavior {
     pub state: String,
 }
@@ -247,6 +252,7 @@ pub fn spawn_pawn(
         sprite_bundle,
         Transform::from_translation(Vec3::new(position.0, position.1, 100.0)),
         pawn,
+        Size { value: pawn_def.size },
         Health::new(pawn_def.max_health),
         Endurance::new(pawn_def.max_endurance),
         CurrentBehavior { state: "idle".to_string() },

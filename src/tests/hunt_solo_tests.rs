@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use bevy::prelude::*;
-    use crate::systems::pawn::{Pawn, Health, Endurance, CurrentBehavior};
+    use crate::systems::pawn::{Pawn, Health, Endurance, CurrentBehavior, Size};
     use crate::systems::pawn_config::{PawnConfig, PawnDefinition, PawnBehaviours, PawnEats, BehaviourConfig, BehaviourType};
     use crate::systems::ai::{HuntSoloAI, hunt_solo_ai_system, setup_hunt_solo_ai};
     use crate::resources::GameConfig;
@@ -21,6 +21,7 @@ mod tests {
             defence: 10,
             attack_speed: 3.0,
             reach: 1,
+            size: 1.0,
             spawn_count: 1,
             behaviours: PawnBehaviours {
                 idle: None,
@@ -44,6 +45,7 @@ mod tests {
             defence: 5,
             attack_speed: 3.0,
             reach: 1,
+            size: 0.8,
             spawn_count: 1,
             behaviours: PawnBehaviours {
                 idle: None,
@@ -67,6 +69,7 @@ mod tests {
             defence: 20,
             attack_speed: 1.0,
             reach: 1,
+            size: 2.0,
             spawn_count: 1,
             behaviours: PawnBehaviours {
                 idle: None,
@@ -175,6 +178,7 @@ mod tests {
             CurrentBehavior { state: "looking_for_food".to_string() },
             Health::new(110),
             Endurance::new(60),
+            Size { value: 1.0 },
             Transform::from_translation(Vec3::new(0.0, 0.0, 100.0)),
             HuntSoloAI::new(),
         )).id();
@@ -184,6 +188,7 @@ mod tests {
             Pawn::new("rabbit".to_string()),
             CurrentBehavior { state: "idle".to_string() },
             Health::new(25),
+            Size { value: 0.8 },
             Transform::from_translation(Vec3::new(32.0, 0.0, 100.0)),
         )).id();
         
@@ -192,6 +197,7 @@ mod tests {
             Pawn::new("golem".to_string()),
             CurrentBehavior { state: "idle".to_string() },
             Health::new(200),
+            Size { value: 2.0 },
             Transform::from_translation(Vec3::new(16.0, 0.0, 100.0)),
         )).id();
 
@@ -226,6 +232,7 @@ mod tests {
             CurrentBehavior { state: "looking_for_food".to_string() },
             Health::new(110),
             Endurance::new(60),
+            Size { value: 1.0 },
             Transform::from_translation(Vec3::new(0.0, 0.0, 100.0)),
             HuntSoloAI::new(),
         )).id();
@@ -235,6 +242,7 @@ mod tests {
             Pawn::new("rabbit".to_string()),
             CurrentBehavior { state: "idle".to_string() },
             Health { current: 0.0, max: 25.0 }, // Dead
+            Size { value: 0.8 },
             Transform::from_translation(Vec3::new(16.0, 0.0, 100.0)),
         )).id();
 

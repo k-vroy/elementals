@@ -18,6 +18,7 @@ mod tests {
             defence: 5,
             attack_speed: 1.0,
             reach: 1,
+            size: 1.0,
             spawn_count: 1,
             behaviours: PawnBehaviours {
                 idle: None,

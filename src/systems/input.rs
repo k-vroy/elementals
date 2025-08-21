@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use crate::resources::GameConfig;
 use crate::systems::world_gen::{TerrainMap, TerrainType, TerrainChanges};
-use crate::systems::pawn::{Pawn, PawnTarget};
+use crate::systems::pawn::{Pawn, PawnTarget, Size};
 use crate::systems::debug_display::DebugDisplayState;
 
 pub fn handle_player_input(
@@ -13,7 +13,7 @@ pub fn handle_player_input(
     mut terrain_changes: ResMut<TerrainChanges>,
     debug_state: Res<DebugDisplayState>,
     mut commands: Commands,
-    player_query: Query<(Entity, &Transform, &Pawn), With<Pawn>>,
+    player_query: Query<(Entity, &Transform, &Pawn, &Size), With<Pawn>>,
 ) {
     if mouse_input.just_pressed(MouseButton::Right) {
         if let Ok(window) = windows.get_single() {
@@ -37,12 +37,12 @@ pub fn handle_player_input(
                         let target_pos = Vec3::new(snapped_x, snapped_y, 100.0);
 
                         // Use pathfinding to find route to target for players only
-                        for (entity, transform, pawn) in player_query.iter() {
+                        for (entity, transform, pawn, size) in player_query.iter() {
                             if pawn.pawn_type == "player" {
                                 let player_pos = (transform.translation.x, transform.translation.y);
                                 let goal_pos = (snapped_x, snapped_y);
 
-                                if let Some(path) = terrain_map.find_path(player_pos, goal_pos) {
+                                if let Some(path) = terrain_map.find_path_for_size(player_pos, goal_pos, size.value) {
                                     let mut pawn_target = PawnTarget::new(target_pos);
                                     pawn_target.set_path(path.clone());
                                     

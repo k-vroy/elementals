@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use rand::prelude::*;
-use crate::systems::pawn::{Pawn, PawnTarget, CurrentBehavior, Health, Endurance};
+use crate::systems::pawn::{Pawn, PawnTarget, CurrentBehavior, Health, Endurance, Size};
 use crate::systems::pawn_config::PawnConfig;
 use crate::systems::world_gen::TerrainMap;
 use crate::resources::GameConfig;
@@ -47,11 +47,11 @@ pub fn wandering_ai_system(
     pawn_config: Res<PawnConfig>,
     config: Res<GameConfig>,
     mut commands: Commands,
-    mut wandering_query: Query<(Entity, &Transform, &Pawn, &CurrentBehavior, &mut WanderingAI), With<Pawn>>,
+    mut wandering_query: Query<(Entity, &Transform, &Pawn, &Size, &CurrentBehavior, &mut WanderingAI), With<Pawn>>,
 ) {
     let mut rng = rand::thread_rng();
     
-    for (entity, transform, pawn, current_behavior, mut ai) in wandering_query.iter_mut() {
+    for (entity, transform, pawn, size, current_behavior, mut ai) in wandering_query.iter_mut() {
         // Get wandering config for this pawn's current behavior
         let wandering_config = match pawn_config.get_wandering_config(&pawn.pawn_type, &current_behavior.state) {
             Some(config) => config,
@@ -82,7 +82,7 @@ pub fn wandering_ai_system(
                 let target_pos = (target_x, target_y);
                 
                 // Check if target is passable and find a path
-                if let Some(path) = terrain_map.find_path(current_pos, target_pos) {
+                if let Some(path) = terrain_map.find_path_for_size(current_pos, target_pos, size.value) {
                     // Create target and set path
                     let mut pawn_target = PawnTarget::new(Vec3::new(target_x, target_y, 100.0));
                     pawn_target.set_path(path);
@@ -137,10 +137,10 @@ pub fn hunt_solo_ai_system(
     pawn_config: Res<PawnConfig>,
     config: Res<GameConfig>,
     mut commands: Commands,
-    mut hunter_query: Query<(Entity, &Transform, &Pawn, &CurrentBehavior, &mut HuntSoloAI, &mut Endurance, Option<&PawnTarget>), With<Pawn>>,
+    mut hunter_query: Query<(Entity, &Transform, &Pawn, &Size, &CurrentBehavior, &mut HuntSoloAI, &mut Endurance, Option<&PawnTarget>), With<Pawn>>,
     mut prey_query: Query<(Entity, &Transform, &Pawn, &mut Health), (With<Pawn>, Without<HuntSoloAI>)>,
 ) {
-    for (hunter_entity, hunter_transform, hunter_pawn, current_behavior, mut hunt_ai, mut hunter_endurance, current_target) in hunter_query.iter_mut() {
+    for (hunter_entity, hunter_transform, hunter_pawn, hunter_size, current_behavior, mut hunt_ai, mut hunter_endurance, current_target) in hunter_query.iter_mut() {
         // Only process if in hunt_solo behavior state
         if let Some(behavior_config) = pawn_config.get_behaviour_config(&hunter_pawn.pawn_type, &current_behavior.state) {
             if !matches!(behavior_config, crate::systems::pawn_config::BehaviourConfig::Simple(crate::systems::pawn_config::BehaviourType::HuntSolo)) {
@@ -205,7 +205,7 @@ pub fn hunt_solo_ai_system(
                         let current_pos = (hunter_transform.translation.x, hunter_transform.translation.y);
                         let target_pos = (target_transform.translation.x, target_transform.translation.y);
                         
-                        if let Some(path) = terrain_map.find_path(current_pos, target_pos) {
+                        if let Some(path) = terrain_map.find_path_for_size(current_pos, target_pos, hunter_size.value) {
                             let mut pawn_target = PawnTarget::new(Vec3::new(target_pos.0, target_pos.1, 100.0));
                             pawn_target.set_path(path);
                             commands.entity(hunter_entity).insert(pawn_target);

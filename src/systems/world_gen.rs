@@ -146,6 +146,57 @@ impl TerrainMap {
         false
     }
 
+    pub fn is_position_passable_for_size(&self, world_x: f32, world_y: f32, size: f32) -> bool {
+        // Convert position to tile coordinates
+        let center_tile = match self.world_to_tile_coords(world_x, world_y) {
+            Some(tile) => tile,
+            None => return false,
+        };
+        
+        // First check: the tile the pawn is centered on must be passable
+        if !self.is_tile_passable(center_tile.0, center_tile.1) {
+            return false;
+        }
+        
+        let half_tile = self.tile_size / 2.0;
+        let radius = size * half_tile;
+        let radius_in_tiles = (radius / self.tile_size).ceil() as i32;
+        
+        // Check all tiles within radius with proper edge-based collision detection
+        for dx in -radius_in_tiles..=radius_in_tiles {
+            for dy in -radius_in_tiles..=radius_in_tiles {
+                let tile_x = center_tile.0 + dx;
+                let tile_y = center_tile.1 + dy;
+                
+                // Skip if this tile is passable
+                if self.is_tile_passable(tile_x, tile_y) {
+                    continue;
+                }
+                
+                // Calculate distance from pawn center to nearest point on the impassable tile
+                let tile_world = self.tile_to_world_coords(tile_x, tile_y);
+                
+                // Find the closest point on the tile to the pawn center
+                let closest_x = (world_x.max(tile_world.0 - half_tile)).min(tile_world.0 + half_tile);
+                let closest_y = (world_y.max(tile_world.1 - half_tile)).min(tile_world.1 + half_tile);
+                
+                // Calculate distance from pawn center to closest point on tile
+                let distance = ((closest_x - world_x).powi(2) + (closest_y - world_y).powi(2)).sqrt();
+                
+                // Use a more generous tolerance to allow access to adjacent tiles
+                // Allow pawns to get close to impassable tiles as long as they don't significantly overlap
+                let tolerance = self.tile_size; // 25% tolerance for better playability
+                
+                // Check if pawn's radius overlaps with this impassable tile (with tolerance)
+                if distance < radius - tolerance {
+                    return false;
+                }
+            }
+        }
+        
+        true
+    }
+
     pub fn find_path(&self, start_world: (f32, f32), goal_world: (f32, f32)) -> Option<Vec<(f32, f32)>> {
         // Convert world coordinates to tile coordinates
         let start_tile = self.world_to_tile_coords(start_world.0, start_world.1)?;
@@ -175,6 +226,72 @@ impl TerrainMap {
                 neighbors
                     .into_iter()
                     .filter(|&(nx, ny)| self.is_tile_passable(nx, ny))
+                    .map(|pos| {
+                        // Diagonal moves cost more (approximately sqrt(2) ≈ 1.414)
+                        let cost = if pos.0 != x && pos.1 != y { 14 } else { 10 };
+                        (pos, cost)
+                    })
+                    .collect::<Vec<_>>()
+            },
+            |&(x, y)| {
+                // Heuristic: Diagonal distance (Chebyshev distance) for 8-directional movement
+                let dx = (x - goal_tile.0).abs();
+                let dy = (y - goal_tile.1).abs();
+                (dx.max(dy) * 10 + (dx.min(dy) * 4)) as u32 // 10 for straight, 14 for diagonal
+            },
+            |&pos| pos == goal_tile,
+        );
+
+        // Convert path back to world coordinates
+        if let Some((path, _cost)) = result {
+            let world_path = path
+                .into_iter()
+                .map(|(tx, ty)| self.tile_to_world_coords(tx, ty))
+                .collect();
+            Some(world_path)
+        } else {
+            None // No path found
+        }
+    }
+
+    pub fn find_path_for_size(&self, start_world: (f32, f32), goal_world: (f32, f32), size: f32) -> Option<Vec<(f32, f32)>> {
+        // Convert world coordinates to tile coordinates
+        let start_tile = self.world_to_tile_coords(start_world.0, start_world.1)?;
+        let goal_tile = self.world_to_tile_coords(goal_world.0, goal_world.1)?;
+
+        // Check if start is passable for this size
+        if !self.is_position_passable_for_size(start_world.0, start_world.1, size) {
+            return None; // Can't start from impassable position
+        }
+
+        // Check if goal is passable for this size
+        if !self.is_position_passable_for_size(goal_world.0, goal_world.1, size) {
+            return None; // Can't path to position that's impassable for this size
+        }
+
+        // A* pathfinding with size awareness
+        let result = astar(
+            &start_tile,
+            |&(x, y)| {
+                // Generate neighbors (8-directional movement with diagonal support)
+                let neighbors = vec![
+                    (x + 1, y),     // Right
+                    (x - 1, y),     // Left
+                    (x, y + 1),     // Up
+                    (x, y - 1),     // Down
+                    (x + 1, y + 1), // Up-Right (diagonal)
+                    (x + 1, y - 1), // Down-Right (diagonal)
+                    (x - 1, y + 1), // Up-Left (diagonal)
+                    (x - 1, y - 1), // Down-Left (diagonal)
+                ];
+                
+                neighbors
+                    .into_iter()
+                    .filter(|&(nx, ny)| {
+                        // Check if this position is passable for the given size
+                        let world_pos = self.tile_to_world_coords(nx, ny);
+                        self.is_position_passable_for_size(world_pos.0, world_pos.1, size)
+                    })
                     .map(|pos| {
                         // Diagonal moves cost more (approximately sqrt(2) ≈ 1.414)
                         let cost = if pos.0 != x && pos.1 != y { 14 } else { 10 };

@@ -54,6 +54,7 @@ pub struct PawnDefinition {
     pub defence: u32,
     pub attack_speed: f32,
     pub reach: u32,
+    pub size: f32,
     pub spawn_count: u32,
     pub behaviours: PawnBehaviours,
     pub eats: PawnEats,

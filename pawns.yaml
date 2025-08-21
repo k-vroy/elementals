@@ -13,6 +13,7 @@ player:
   attack_speed: 1 
   spawn_count: 1
   reach: 1
+  size: 1
   behaviours:
     idle: null
     looking_for_food: null
@@ -34,6 +35,7 @@ rabbit:
   strength: 5
   attack_speed: 3 
   reach: 1
+  size: 1
   spawn_count: 5
   behaviours:
     idle:
@@ -59,6 +61,7 @@ wolf:
   strength: 30
   attack_speed: 3 
   reach: 1
+  size: 1
   spawn_count: 1
   behaviours:
     idle:
