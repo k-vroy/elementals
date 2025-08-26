@@ -1,0 +1,29 @@
+tileset_name: grounds
+tile_size: 16
+tiles_per_row: 16
+total_tiles: 4
+sprites:
+- name: dirt
+  index: 0
+  x: 0
+  y: 0
+  width: 16
+  height: 16
+- name: grass
+  index: 1
+  x: 16
+  y: 0
+  width: 16
+  height: 16
+- name: stone
+  index: 2
+  x: 32
+  y: 0
+  width: 16
+  height: 16
+- name: water
+  index: 3
+  x: 48
+  y: 0
+  width: 16
+  height: 16
