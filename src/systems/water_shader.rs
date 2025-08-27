@@ -13,6 +13,10 @@ impl Material2d for WaterMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/water.wgsl".into()
     }
+    
+    fn alpha_mode(&self) -> bevy::sprite::AlphaMode2d {
+        bevy::sprite::AlphaMode2d::Blend
+    }
 }
 
 pub struct WaterShaderPlugin;
@@ -44,7 +48,9 @@ pub fn spawn_water_overlays(
     mut materials: ResMut<Assets<WaterMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    let water_material = materials.add(WaterMaterial { time: 0.0 });
+    let water_material = materials.add(WaterMaterial { 
+        time: 0.0,
+    });
     let quad_mesh = meshes.add(Rectangle::new(terrain_map.tile_size, terrain_map.tile_size));
 
     for x in 0..terrain_map.width {
@@ -57,7 +63,7 @@ pub fn spawn_water_overlays(
                 commands.spawn((
                     Mesh2d::from(quad_mesh.clone()),
                     MeshMaterial2d(water_material.clone()),
-                    Transform::from_translation(Vec3::new(world_x, world_y, 0.5)),
+                    Transform::from_translation(Vec3::new(world_x, world_y, 1.0)),
                     WaterTile,
                 ));
                 }

@@ -2,30 +2,83 @@
 
 @group(2) @binding(0) var<uniform> time: f32;
 
-fn wave_noise(world_pos: vec2<f32>, time: f32) -> f32 {
-    // Scale down the world position to create appropriate wave frequency
-    let scaled_pos = world_pos * 0.01;
+// Convert RGB to HSV
+fn rgb_to_hsv(color: vec3<f32>) -> vec3<f32> {
+    let max_val = max(max(color.r, color.g), color.b);
+    let min_val = min(min(color.r, color.g), color.b);
+    let delta = max_val - min_val;
     
-    let wave1 = sin(scaled_pos.x * 8.0 + time * 2.0) * 0.5 + 0.5;
-    let wave2 = sin(scaled_pos.y * 6.0 + time * 1.5) * 0.5 + 0.5;
-    let wave3 = sin((scaled_pos.x + scaled_pos.y) * 4.0 + time * 3.0) * 0.5 + 0.5;
-    return (wave1 + wave2 + wave3) / 3.0;
+    var hue: f32 = 0.0;
+    let saturation = select(0.0, delta / max_val, max_val > 0.0);
+    let value = max_val;
+    
+    if (delta > 0.0) {
+        if (max_val == color.r) {
+            hue = (color.g - color.b) / delta;
+        } else if (max_val == color.g) {
+            hue = 2.0 + (color.b - color.r) / delta;
+        } else {
+            hue = 4.0 + (color.r - color.g) / delta;
+        }
+        hue = hue / 6.0;
+        if (hue < 0.0) {
+            hue = hue + 1.0;
+        }
+    }
+    
+    return vec3<f32>(hue, saturation, value);
+}
+
+// Convert HSV to RGB
+fn hsv_to_rgb(hsv: vec3<f32>) -> vec3<f32> {
+    let hue = hsv.x * 6.0;
+    let saturation = hsv.y;
+    let value = hsv.z;
+    
+    let c = value * saturation;
+    let x = c * (1.0 - abs((hue % 2.0) - 1.0));
+    let m = value - c;
+    
+    var rgb: vec3<f32>;
+    
+    if (hue < 1.0) {
+        rgb = vec3<f32>(c, x, 0.0);
+    } else if (hue < 2.0) {
+        rgb = vec3<f32>(x, c, 0.0);
+    } else if (hue < 3.0) {
+        rgb = vec3<f32>(0.0, c, x);
+    } else if (hue < 4.0) {
+        rgb = vec3<f32>(0.0, x, c);
+    } else if (hue < 5.0) {
+        rgb = vec3<f32>(x, 0.0, c);
+    } else {
+        rgb = vec3<f32>(c, 0.0, x);
+    }
+    
+    return rgb + m;
 }
 
 @fragment
 fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
-    let base_color = vec3<f32>(0.1, 0.3, 0.8); // Base water blue
-    let highlight_color = vec3<f32>(0.3, 0.6, 1.0); // Lighter blue for waves
-    
-    // Use world position instead of UV coordinates for seamless tiling
+    // Create varied hue rotation using multiple frequencies
     let world_pos = mesh.world_position.xy;
-    let wave_intensity = wave_noise(world_pos, time);
     
-    // Mix base color with wave highlights
-    let final_color = mix(base_color, highlight_color, wave_intensity * 0.3);
+    // Base hue rotation with time (very subtle)
+    let base_rotation = time * 0.1;
     
-    // Add some transparency for water effect
-    let alpha = 0.8 + wave_intensity * 0.2;
+    // Add spatial variation based on world position (subtle)
+    let spatial_variation = sin(world_pos.x * 0.01 + time * 0.4) * 0.05 + 
+                           cos(world_pos.y * 0.01 + time * 0.3) * 0.04;
     
-    return vec4<f32>(final_color, alpha);
+    // Add oscillating variation (subtle)
+    let wave_variation = sin(time * 0.6) * 0.03 + cos(time * 0.35) * 0.02;
+    
+    // Combine all variations (much smaller range)
+    let total_hue_shift = base_rotation + spatial_variation + wave_variation;
+    
+    // Create a subtle tint based on hue shift
+    let hue_color = hsv_to_rgb(vec3<f32>(total_hue_shift, 0.3, 0.8));
+    
+    // Return a very subtle additive tint
+    return vec4<f32>(hue_color * 0.2, 0.6);
 }
