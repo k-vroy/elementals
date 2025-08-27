@@ -18,17 +18,17 @@ water:
   sprite: "tileset::grounds::water"
   passable: false
   height_min: 0.0
-  height_max: 0.5
+  height_max: 0.15
 dirt:
   sprite: "tileset::grounds::dirt"
   passable: true
-  height_min: 0.6
-  height_max: 0.7
+  height_min: 0.15
+  height_max: 0.3
 grass:
   sprite: "tileset::grounds::grass"
   passable: true
-  height_min: 0.5
-  height_max: 0.6
+  height_min: 0.3
+  height_max: 0.7
 stone:
   sprite: "tileset::grounds::stone"
   passable: false

@@ -16,10 +16,30 @@ pub struct GroundConfig {
     pub height_max: f32,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SpriteInfo {
+    pub name: String,
+    pub index: u32,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TilesetIndex {
+    pub tileset_name: String,
+    pub tile_size: u32,
+    pub tiles_per_row: u32,
+    pub total_tiles: u32,
+    pub sprites: Vec<SpriteInfo>,
+}
+
 #[derive(Debug, Clone, Resource)]
 pub struct GroundConfigs {
     pub configs: HashMap<String, GroundConfig>,
     pub terrain_mapping: HashMap<String, usize>, // Maps config names to terrain type indices
+    pub tileset_indices: HashMap<String, TilesetIndex>, // Maps tileset names to their sprite indices
 }
 
 impl GroundConfigs {
@@ -34,11 +54,39 @@ impl GroundConfigs {
             .enumerate()
             .map(|(i, name)| ((*name).clone(), i))
             .collect();
+
+        // Load tileset indices from assets/tilesets/*.yaml files
+        let tileset_indices = Self::load_tileset_indices()?;
             
         Ok(Self {
             configs,
             terrain_mapping,
+            tileset_indices,
         })
+    }
+
+    fn load_tileset_indices() -> Result<HashMap<String, TilesetIndex>, Box<dyn std::error::Error>> {
+        let mut tileset_indices = HashMap::new();
+        
+        // Load known tileset index files
+        let tilesets_path = std::path::Path::new("assets/tilesets");
+        if tilesets_path.exists() {
+            for entry in std::fs::read_dir(tilesets_path)? {
+                let entry = entry?;
+                let path = entry.path();
+                
+                if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        let yaml_content = std::fs::read_to_string(&path)?;
+                        if let Ok(tileset_index) = serde_yaml::from_str::<TilesetIndex>(&yaml_content) {
+                            tileset_indices.insert(stem.to_string(), tileset_index);
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(tileset_indices)
     }
     
     pub fn get_terrain_type_for_height(&self, height: f32) -> Option<usize> {
@@ -61,6 +109,42 @@ impl GroundConfigs {
             }
         }
         false // Default to impassable if not found
+    }
+
+    /// Resolves a sprite path like "tileset::grounds::water" to a texture index
+    pub fn resolve_sprite_path_to_index(&self, terrain_type: usize) -> Option<u32> {
+        // Find the config by terrain type index
+        for (name, config) in &self.configs {
+            if let Some(&index) = self.terrain_mapping.get(name) {
+                if index == terrain_type {
+                    return self.parse_sprite_path(&config.sprite);
+                }
+            }
+        }
+        None
+    }
+
+    fn parse_sprite_path(&self, sprite_path: &str) -> Option<u32> {
+        // Parse sprite path format: "tileset::tileset_name::sprite_name"
+        let parts: Vec<&str> = sprite_path.split("::").collect();
+        if parts.len() != 3 || parts[0] != "tileset" {
+            return None;
+        }
+
+        let tileset_name = parts[1];
+        let sprite_name = parts[2];
+
+        // Look up the tileset
+        let tileset_index = self.tileset_indices.get(tileset_name)?;
+        
+        // Find the sprite by name
+        for sprite in &tileset_index.sprites {
+            if sprite.name == sprite_name {
+                return Some(sprite.index);
+            }
+        }
+
+        None
     }
 }
 
@@ -577,7 +661,7 @@ fn generate_ground_layer(
     terrain_map: &mut TerrainMap,
     ground_configs: &GroundConfigs,
 ) {
-    let texture_handle: Handle<Image> = asset_server.load("ground_tileset.png");
+    let texture_handle: Handle<Image> = asset_server.load("tilesets/grounds.png");
     let tilemap_entity = commands.spawn_empty().id();
     let mut tile_storage = TileStorage::empty(*map_size);
     let mut rng = rand::thread_rng();
@@ -601,11 +685,16 @@ fn generate_ground_layer(
             // Store terrain type in the terrain map
             terrain_map.set_tile(x, y, terrain_type);
 
+            // Resolve sprite path to texture index
+            let texture_index = ground_configs
+                .resolve_sprite_path_to_index(terrain_type)
+                .unwrap_or(terrain_type as u32); // Fallback to terrain_type if resolution fails
+
             let tile_entity = commands
                 .spawn(TileBundle {
                     position: tile_pos,
                     tilemap_id: TilemapId(tilemap_entity),
-                    texture_index: TileTextureIndex(terrain_type as u32),
+                    texture_index: TileTextureIndex(texture_index),
                     ..Default::default()
                 })
                 .id();
@@ -743,6 +832,7 @@ pub fn update_terrain_visuals(
     mut terrain_changes: ResMut<TerrainChanges>,
     mut tile_query: Query<&mut TileTextureIndex>,
     tile_storage_query: Query<&TileStorage, With<TerrainLayer>>,
+    ground_configs: Res<GroundConfigs>,
 ) {
     if terrain_changes.changed_tiles.is_empty() {
         return;
@@ -755,7 +845,11 @@ pub fn update_terrain_visuals(
             
             if let Some(tile_entity) = tile_storage.get(&tile_pos) {
                 if let Ok(mut texture_index) = tile_query.get_mut(tile_entity) {
-                    texture_index.0 = terrain_type as u32;
+                    // Resolve sprite path to texture index
+                    let resolved_index = ground_configs
+                        .resolve_sprite_path_to_index(terrain_type)
+                        .unwrap_or(terrain_type as u32); // Fallback to terrain_type if resolution fails
+                    texture_index.0 = resolved_index;
                 }
             }
         }
