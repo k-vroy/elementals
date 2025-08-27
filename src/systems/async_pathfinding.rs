@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task};
-use crate::systems::world_gen::TerrainMap;
+use crate::systems::world_gen::{TerrainMap, GroundConfigs};
 use crate::systems::pawn::PawnTarget;
 use crate::systems::pathfinding_cache::PathfindingCache;
 
@@ -91,6 +91,7 @@ impl PathfindingRequest {
 pub fn spawn_pathfinding_tasks(
     mut commands: Commands,
     terrain_map: Res<TerrainMap>,
+    ground_configs: Res<GroundConfigs>,
     mut request_counter: ResMut<PathfindingRequestCounter>,
     request_query: Query<(Entity, &PathfindingRequest), Without<PathfindingTask>>,
 ) {
@@ -106,6 +107,7 @@ pub fn spawn_pathfinding_tasks(
         
         // Clone data for the async task
         let terrain_clone = terrain_map.clone();
+        let ground_configs_clone = ground_configs.clone();
         let start = request.start;
         let goal = request.goal;
         let size = request.size;
@@ -113,7 +115,7 @@ pub fn spawn_pathfinding_tasks(
         // Spawn async pathfinding task
         let task = task_pool.spawn(async move {
             // Perform pathfinding computation in background thread
-            let path = terrain_clone.find_path_for_size(start, goal, size);
+            let path = terrain_clone.find_path_for_size(start, goal, size, &ground_configs_clone);
             
             PathfindingResult {
                 path,
@@ -167,6 +169,7 @@ pub fn handle_completed_pathfinding(
 pub fn spawn_cached_pathfinding_tasks(
     mut commands: Commands,
     terrain_map: Res<TerrainMap>,
+    ground_configs: Res<GroundConfigs>,
     mut global_cache: ResMut<GlobalPathfindingCache>,
     mut request_counter: ResMut<PathfindingRequestCounter>,
     request_query: Query<(Entity, &PathfindingRequest), Without<PathfindingTask>>,
@@ -206,13 +209,14 @@ pub fn spawn_cached_pathfinding_tasks(
         
         // Cache miss, spawn async task
         let terrain_clone = terrain_map.clone();
+        let ground_configs_clone = ground_configs.clone();
         let start = request.start;
         let goal = request.goal;
         let size = request.size;
         
         let task = task_pool.spawn(async move {
             // Perform pathfinding computation in background thread
-            let path = terrain_clone.find_path_for_size(start, goal, size);
+            let path = terrain_clone.find_path_for_size(start, goal, size, &ground_configs_clone);
             
             PathfindingResult {
                 path,

@@ -3,20 +3,22 @@ mod tests {
     use bevy::prelude::*;
     use crate::systems::async_pathfinding::{
         PathfindingRequest, PathfindingPriority, PathfindingTask, 
-        spawn_cached_pathfinding_tasks, handle_completed_cached_pathfinding,
+        spawn_cached_pathfinding_tasks,
         PathfindingRequestCounter, GlobalPathfindingCache
     };
-    use crate::systems::world_gen::{TerrainMap, TerrainType};
-    use crate::systems::pawn::{PawnTarget, Size, Pawn};
-    use crate::tests::setup_test_app;
+    use crate::systems::world_gen::TerrainMap;
+    use crate::systems::pawn::{Size, Pawn};
+    use crate::tests::{setup_test_app, create_test_ground_configs};
 
     fn create_simple_terrain() -> TerrainMap {
         let mut terrain_map = TerrainMap::new(5, 5, 32.0);
+        let ground_configs = create_test_ground_configs();
+        let grass_type = *ground_configs.terrain_mapping.get("grass").unwrap_or(&2);
         
         // Create simple open terrain
         for x in 0..5 {
             for y in 0..5 {
-                terrain_map.set_tile(x, y, TerrainType::Grass);
+                terrain_map.set_tile(x, y, grass_type);
             }
         }
         
@@ -53,6 +55,7 @@ mod tests {
         
         // Add resources
         app.insert_resource(terrain_map);
+        app.insert_resource(create_test_ground_configs());
         app.insert_resource(PathfindingRequestCounter::default());
         app.insert_resource(GlobalPathfindingCache::default());
         
@@ -85,6 +88,7 @@ mod tests {
         
         // Add resources
         app.insert_resource(terrain_map);
+        app.insert_resource(create_test_ground_configs());
         app.insert_resource(PathfindingRequestCounter::default());
         
         // Pre-populate cache with a path result

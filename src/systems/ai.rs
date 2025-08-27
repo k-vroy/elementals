@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use rand::prelude::*;
 use crate::systems::pawn::{Pawn, PawnTarget, CurrentBehavior, Health, Endurance, Size};
 use crate::systems::pawn_config::PawnConfig;
-use crate::systems::world_gen::TerrainMap;
+use crate::systems::world_gen::{TerrainMap, GroundConfigs};
 use crate::systems::async_pathfinding::{PathfindingRequest, PathfindingPriority, request_pathfinding};
 use crate::resources::GameConfig;
 
@@ -45,6 +45,7 @@ impl HuntSoloAI {
 pub fn wandering_ai_system(
     time: Res<Time>,
     terrain_map: Res<TerrainMap>,
+    ground_configs: Res<GroundConfigs>,
     pawn_config: Res<PawnConfig>,
     config: Res<GameConfig>,
     mut commands: Commands,
@@ -83,7 +84,7 @@ pub fn wandering_ai_system(
                 let target_pos = (target_x, target_y);
                 
                 // Check if target is potentially passable (quick check)
-                if terrain_map.is_position_passable_for_size(target_pos.0, target_pos.1, size.value) {
+                if terrain_map.is_position_passable_for_size(target_pos.0, target_pos.1, size.value, &ground_configs) {
                     // Request async pathfinding
                     request_pathfinding(&mut commands, entity, current_pos, target_pos, size.value);
                     break;

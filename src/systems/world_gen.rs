@@ -5,25 +5,66 @@ use crate::resources::GameConfig;
 use noise::{NoiseFn, Perlin, Simplex};
 use pathfinding::prelude::astar;
 use rand::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum TerrainType {
-    Grass = 0,
-    Dirt = 1,
-    Stone = 2,
-    Water = 3,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GroundConfig {
+    pub sprite: String,
+    pub passable: bool,
+    pub height_min: f32,
+    pub height_max: f32,
 }
 
-impl TerrainType {
-    pub fn is_passable(self) -> bool {
-        match self {
-            TerrainType::Grass => true,
-            TerrainType::Dirt => true,
-            TerrainType::Stone => false, // Stone is impassable
-            TerrainType::Water => false, // Water is impassable
+#[derive(Debug, Clone, Resource)]
+pub struct GroundConfigs {
+    pub configs: HashMap<String, GroundConfig>,
+    pub terrain_mapping: HashMap<String, usize>, // Maps config names to terrain type indices
+}
+
+impl GroundConfigs {
+    pub fn load_from_yaml(yaml_content: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let configs: HashMap<String, GroundConfig> = serde_yaml::from_str(yaml_content)?;
+        
+        // Create terrain mapping with deterministic order
+        let mut sorted_names: Vec<_> = configs.keys().collect();
+        sorted_names.sort();
+        let terrain_mapping = sorted_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| ((*name).clone(), i))
+            .collect();
+            
+        Ok(Self {
+            configs,
+            terrain_mapping,
+        })
+    }
+    
+    pub fn get_terrain_type_for_height(&self, height: f32) -> Option<usize> {
+        // Find the terrain type that matches the height range
+        for (name, config) in &self.configs {
+            if height >= config.height_min && height <= config.height_max {
+                return self.terrain_mapping.get(name).copied();
+            }
         }
+        None
+    }
+    
+    pub fn is_passable(&self, terrain_type: usize) -> bool {
+        // Find the config by terrain type index
+        for (name, config) in &self.configs {
+            if let Some(&index) = self.terrain_mapping.get(name) {
+                if index == terrain_type {
+                    return config.passable;
+                }
+            }
+        }
+        false // Default to impassable if not found
     }
 }
+
+pub type TerrainType = usize;
 
 #[derive(Resource, Clone)]
 pub struct TerrainMap {
@@ -39,7 +80,7 @@ impl TerrainMap {
             width,
             height,
             tile_size,
-            tiles: vec![vec![TerrainType::Grass; height as usize]; width as usize],
+            tiles: vec![vec![0; height as usize]; width as usize], // Default to first terrain type
         }
     }
 
@@ -65,9 +106,9 @@ impl TerrainMap {
         }
     }
 
-    pub fn is_passable_at_world_pos(&self, world_x: f32, world_y: f32) -> bool {
+    pub fn is_passable_at_world_pos(&self, world_x: f32, world_y: f32, ground_configs: &GroundConfigs) -> bool {
         self.get_terrain_at_world_pos(world_x, world_y)
-            .map(|terrain| terrain.is_passable())
+            .map(|terrain| ground_configs.is_passable(terrain))
             .unwrap_or(false) // If out of bounds, consider impassable
     }
 
@@ -95,18 +136,18 @@ impl TerrainMap {
         (world_x, world_y)
     }
 
-    pub fn is_tile_passable(&self, tile_x: i32, tile_y: i32) -> bool {
+    pub fn is_tile_passable(&self, tile_x: i32, tile_y: i32, ground_configs: &GroundConfigs) -> bool {
         if tile_x >= 0 && tile_x < self.width as i32 && tile_y >= 0 && tile_y < self.height as i32 {
-            self.tiles[tile_x as usize][tile_y as usize].is_passable()
+            ground_configs.is_passable(self.tiles[tile_x as usize][tile_y as usize])
         } else {
             false // Out of bounds is impassable
         }
     }
 
-    pub fn find_nearest_passable_tile(&self, start_world: (f32, f32)) -> Option<(f32, f32)> {
+    pub fn find_nearest_passable_tile(&self, start_world: (f32, f32), ground_configs: &GroundConfigs) -> Option<(f32, f32)> {
         // First check if the starting position is already passable
         if let Some((start_tile_x, start_tile_y)) = self.world_to_tile_coords(start_world.0, start_world.1) {
-            if self.is_tile_passable(start_tile_x, start_tile_y) {
+            if self.is_tile_passable(start_tile_x, start_tile_y, ground_configs) {
                 return Some(self.tile_to_world_coords(start_tile_x, start_tile_y));
             }
         }
@@ -125,7 +166,7 @@ impl TerrainMap {
                     let tile_x = center_tile.0 + dx;
                     let tile_y = center_tile.1 + dy;
                     
-                    if self.is_tile_passable(tile_x, tile_y) {
+                    if self.is_tile_passable(tile_x, tile_y, ground_configs) {
                         return Some(self.tile_to_world_coords(tile_x, tile_y));
                     }
                 }
@@ -146,7 +187,7 @@ impl TerrainMap {
         false
     }
 
-    fn is_position_passable_for_size_with_cache(&self, world_x: f32, world_y: f32, size: f32, cache: &mut Option<&mut crate::systems::pathfinding_cache::PathfindingCache>) -> bool {
+    fn is_position_passable_for_size_with_cache(&self, world_x: f32, world_y: f32, size: f32, ground_configs: &GroundConfigs, cache: &mut Option<&mut crate::systems::pathfinding_cache::PathfindingCache>) -> bool {
         if let Some(cache) = cache {
             // Try cache first
             if let Some(tile_coords) = self.world_to_tile_coords(world_x, world_y) {
@@ -155,7 +196,7 @@ impl TerrainMap {
                 }
                 
                 // Not cached, compute and cache
-                let result = self.is_position_passable_for_size(world_x, world_y, size);
+                let result = self.is_position_passable_for_size(world_x, world_y, size, ground_configs);
                 cache.cache_passability(tile_coords.0, tile_coords.1, size, result);
                 result
             } else {
@@ -163,11 +204,11 @@ impl TerrainMap {
             }
         } else {
             // No cache available, compute directly
-            self.is_position_passable_for_size(world_x, world_y, size)
+            self.is_position_passable_for_size(world_x, world_y, size, ground_configs)
         }
     }
 
-    pub fn is_position_passable_for_size(&self, world_x: f32, world_y: f32, size: f32) -> bool {
+    pub fn is_position_passable_for_size(&self, world_x: f32, world_y: f32, size: f32, ground_configs: &GroundConfigs) -> bool {
         // Convert position to tile coordinates
         let center_tile = match self.world_to_tile_coords(world_x, world_y) {
             Some(tile) => tile,
@@ -175,7 +216,7 @@ impl TerrainMap {
         };
         
         // First check: the tile the pawn is centered on must be passable
-        if !self.is_tile_passable(center_tile.0, center_tile.1) {
+        if !self.is_tile_passable(center_tile.0, center_tile.1, ground_configs) {
             return false;
         }
         
@@ -190,7 +231,7 @@ impl TerrainMap {
                 let tile_y = center_tile.1 + dy;
                 
                 // Skip if this tile is passable
-                if self.is_tile_passable(tile_x, tile_y) {
+                if self.is_tile_passable(tile_x, tile_y, ground_configs) {
                     continue;
                 }
                 
@@ -218,15 +259,18 @@ impl TerrainMap {
         true
     }
 
-    pub fn find_path(&self, start_world: (f32, f32), goal_world: (f32, f32)) -> Option<Vec<(f32, f32)>> {
+    pub fn find_path(&self, start_world: (f32, f32), goal_world: (f32, f32), ground_configs: &GroundConfigs) -> Option<Vec<(f32, f32)>> {
         // Convert world coordinates to tile coordinates
         let start_tile = self.world_to_tile_coords(start_world.0, start_world.1)?;
         let goal_tile = self.world_to_tile_coords(goal_world.0, goal_world.1)?;
 
         // Check if goal is passable
-        if !self.is_tile_passable(goal_tile.0, goal_tile.1) {
+        if !self.is_tile_passable(goal_tile.0, goal_tile.1, ground_configs) {
             return None; // Can't path to impassable tile
         }
+
+        // Capture ground_configs for use in closure
+        let ground_configs = ground_configs;
 
         // A* pathfinding
         let result = astar(
@@ -246,7 +290,7 @@ impl TerrainMap {
                 
                 neighbors
                     .into_iter()
-                    .filter(|&(nx, ny)| self.is_tile_passable(nx, ny))
+                    .filter(|&(nx, ny)| self.is_tile_passable(nx, ny, ground_configs))
                     .map(|pos| {
                         // Diagonal moves cost more (approximately sqrt(2) ≈ 1.414)
                         let cost = if pos.0 != x && pos.1 != y { 14 } else { 10 };
@@ -275,11 +319,11 @@ impl TerrainMap {
         }
     }
 
-    fn is_path_segment_clear(&self, from_world: (f32, f32), to_world: (f32, f32), size: f32) -> bool {
-        self.is_path_segment_clear_with_cache(from_world, to_world, size, &mut None)
+    fn is_path_segment_clear(&self, from_world: (f32, f32), to_world: (f32, f32), size: f32, ground_configs: &GroundConfigs) -> bool {
+        self.is_path_segment_clear_with_cache(from_world, to_world, size, ground_configs, &mut None)
     }
 
-    fn is_path_segment_clear_with_cache(&self, from_world: (f32, f32), to_world: (f32, f32), size: f32, cache: &mut Option<&mut crate::systems::pathfinding_cache::PathfindingCache>) -> bool {
+    fn is_path_segment_clear_with_cache(&self, from_world: (f32, f32), to_world: (f32, f32), size: f32, ground_configs: &GroundConfigs, cache: &mut Option<&mut crate::systems::pathfinding_cache::PathfindingCache>) -> bool {
         // Sample points along the path to ensure the entire segment is clear
         let dx = to_world.0 - from_world.0;
         let dy = to_world.1 - from_world.1;
@@ -287,7 +331,7 @@ impl TerrainMap {
         
         // If it's a very short distance, just check the endpoints
         if distance < self.tile_size * 0.1 {
-            return self.is_position_passable_for_size_with_cache(to_world.0, to_world.1, size, cache);
+            return self.is_position_passable_for_size_with_cache(to_world.0, to_world.1, size, ground_configs, cache);
         }
         
         // Sample at intervals smaller than the pawn's radius to ensure coverage
@@ -316,7 +360,7 @@ impl TerrainMap {
             let sample_x = from_world.0 + dx * t;
             let sample_y = from_world.1 + dy * t;
             
-            if !self.is_position_passable_for_size_with_cache(sample_x, sample_y, size, cache) {
+            if !self.is_position_passable_for_size_with_cache(sample_x, sample_y, size, ground_configs, cache) {
                 return false;
             }
         }
@@ -325,7 +369,7 @@ impl TerrainMap {
     }
 
     /// Cached version of pathfinding - use this for performance
-    pub fn find_path_for_size_cached(&self, start_world: (f32, f32), goal_world: (f32, f32), size: f32, cache: &mut crate::systems::pathfinding_cache::PathfindingCache) -> Option<Vec<(f32, f32)>> {
+    pub fn find_path_for_size_cached(&self, start_world: (f32, f32), goal_world: (f32, f32), size: f32, ground_configs: &GroundConfigs, cache: &mut crate::systems::pathfinding_cache::PathfindingCache) -> Option<Vec<(f32, f32)>> {
         // Convert world coordinates to tile coordinates
         let start_tile = self.world_to_tile_coords(start_world.0, start_world.1)?;
         let goal_tile = self.world_to_tile_coords(goal_world.0, goal_world.1)?;
@@ -336,7 +380,7 @@ impl TerrainMap {
         }
 
         // Compute path if not cached
-        let result = self.find_path_for_size_internal(start_world, goal_world, size, Some(cache));
+        let result = self.find_path_for_size_internal(start_world, goal_world, size, ground_configs, Some(cache));
         
         // Cache the result
         cache.cache_path(start_tile, goal_tile, size, result.clone(), self);
@@ -345,22 +389,22 @@ impl TerrainMap {
     }
 
     /// Original pathfinding method (kept for compatibility)
-    pub fn find_path_for_size(&self, start_world: (f32, f32), goal_world: (f32, f32), size: f32) -> Option<Vec<(f32, f32)>> {
-        self.find_path_for_size_internal(start_world, goal_world, size, None)
+    pub fn find_path_for_size(&self, start_world: (f32, f32), goal_world: (f32, f32), size: f32, ground_configs: &GroundConfigs) -> Option<Vec<(f32, f32)>> {
+        self.find_path_for_size_internal(start_world, goal_world, size, ground_configs, None)
     }
 
-    fn find_path_for_size_internal(&self, start_world: (f32, f32), goal_world: (f32, f32), size: f32, mut cache: Option<&mut crate::systems::pathfinding_cache::PathfindingCache>) -> Option<Vec<(f32, f32)>> {
+    fn find_path_for_size_internal(&self, start_world: (f32, f32), goal_world: (f32, f32), size: f32, ground_configs: &GroundConfigs, mut cache: Option<&mut crate::systems::pathfinding_cache::PathfindingCache>) -> Option<Vec<(f32, f32)>> {
         // Convert world coordinates to tile coordinates
         let start_tile = self.world_to_tile_coords(start_world.0, start_world.1)?;
         let goal_tile = self.world_to_tile_coords(goal_world.0, goal_world.1)?;
 
         // Check if start is passable for this size
-        if !self.is_position_passable_for_size_with_cache(start_world.0, start_world.1, size, &mut cache) {
+        if !self.is_position_passable_for_size_with_cache(start_world.0, start_world.1, size, ground_configs, &mut cache) {
             return None; // Can't start from impassable position
         }
 
         // Check if goal is passable for this size
-        if !self.is_position_passable_for_size_with_cache(goal_world.0, goal_world.1, size, &mut cache) {
+        if !self.is_position_passable_for_size_with_cache(goal_world.0, goal_world.1, size, ground_configs, &mut cache) {
             return None; // Can't path to position that's impassable for this size
         }
 
@@ -386,13 +430,13 @@ impl TerrainMap {
                     .filter(|&(nx, ny)| {
                         // Check if destination position is passable for the given size
                         let to_world = self.tile_to_world_coords(nx, ny);
-                        if !self.is_position_passable_for_size(to_world.0, to_world.1, size) {
+                        if !self.is_position_passable_for_size(to_world.0, to_world.1, size, ground_configs) {
                             return false;
                         }
                         
                         // Check if the entire path segment from current position to neighbor is clear
                         let from_world = self.tile_to_world_coords(x, y);
-                        self.is_path_segment_clear(from_world, to_world, size)
+                        self.is_path_segment_clear(from_world, to_world, size, ground_configs)
                     })
                     .map(|pos| {
                         // Diagonal moves cost more (approximately sqrt(2) ≈ 1.414)
@@ -471,25 +515,17 @@ impl TerrainNoise {
         }
     }
 
-    pub fn get_terrain_type(&self, x: f64, y: f64) -> TerrainType {
+    pub fn get_terrain_type(&self, x: f64, y: f64, ground_configs: &GroundConfigs) -> usize {
         let scale = 0.05; // Controls noise frequency
         
         let elevation = self.elevation.get([x * scale, y * scale]);
-        let moisture = self.moisture.get([x * scale * 0.7, y * scale * 0.7]);
-        let temperature = self.temperature.get([x * scale * 1.3, y * scale * 1.3]);
 
-        // Normalize values to 0-1 range
-        let elevation = (elevation + 1.0) * 0.5;
-        let moisture = (moisture + 1.0) * 0.5;
-        let temperature = (temperature + 1.0) * 0.5;
+        // Normalize elevation to 0-1 range
+        let height = (elevation + 1.0) * 0.5;
 
-        // Terrain selection based on biome logic
-        match (elevation, moisture, temperature) {
-            (e, _, _) if e < 0.2 => TerrainType::Water,
-            (e, _m, t) if e > 0.8 && t < 0.3 => TerrainType::Stone,
-            (_, m, _) if m < 0.3 => TerrainType::Dirt,
-            _ => TerrainType::Grass,
-        }
+        // Use ground configs to determine terrain type based on height
+        ground_configs.get_terrain_type_for_height(height as f32)
+            .unwrap_or(0) // Default to first terrain type if no match found
     }
 }
 
@@ -498,6 +534,11 @@ pub fn generate_world(
     asset_server: Res<AssetServer>,
     config: Res<GameConfig>,
 ) {
+    // Load ground configuration from YAML
+    let grounds_yaml = std::fs::read_to_string("grounds.yaml")
+        .expect("Failed to read grounds.yaml file");
+    let ground_configs = GroundConfigs::load_from_yaml(&grounds_yaml)
+        .expect("Failed to parse grounds.yaml");
     let map_size = TilemapSize { 
         x: config.map_width, 
         y: config.map_height 
@@ -513,10 +554,11 @@ pub fn generate_world(
     let mut terrain_map = TerrainMap::new(config.map_width, config.map_height, config.tile_size);
     
     // Generate ground layer and populate terrain map
-    generate_ground_layer(&mut commands, &asset_server, &map_size, &tile_size, &grid_size, &map_type, &mut terrain_map);
+    generate_ground_layer(&mut commands, &asset_server, &map_size, &tile_size, &grid_size, &map_type, &mut terrain_map, &ground_configs);
     
-    // Insert the populated terrain map as a resource
+    // Insert the populated terrain map and ground configs as resources
     commands.insert_resource(terrain_map);
+    commands.insert_resource(ground_configs);
     
     // Generate objects layer
     // generate_objects_layer(&mut commands, &asset_server, &map_size, &tile_size, &grid_size, &map_type);
@@ -533,6 +575,7 @@ fn generate_ground_layer(
     grid_size: &TilemapGridSize,
     map_type: &TilemapType,
     terrain_map: &mut TerrainMap,
+    ground_configs: &GroundConfigs,
 ) {
     let texture_handle: Handle<Image> = asset_server.load("ground_tileset.png");
     let tilemap_entity = commands.spawn_empty().id();
@@ -547,11 +590,12 @@ fn generate_ground_layer(
         for y in 0..map_size.y {
             let tile_pos = TilePos { x, y };
             
-            // Use noise-based terrain generation
+            // Use noise-based terrain generation with ground configs
             let terrain_type = if x == 0 || y == 0 || x == map_size.x - 1 || y == map_size.y - 1 {
-                TerrainType::Water // Keep water border for now
+                // Find water terrain type from configs (or default to first)
+                ground_configs.terrain_mapping.get("water").copied().unwrap_or(0)
             } else {
-                noise.get_terrain_type(x as f64, y as f64)
+                noise.get_terrain_type(x as f64, y as f64, ground_configs)
             };
 
             // Store terrain type in the terrain map

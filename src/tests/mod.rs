@@ -9,11 +9,38 @@ pub mod pathfinding_cache_tests;
 pub mod async_pathfinding_tests;
 
 use bevy::prelude::*;
-use crate::systems::world_gen::{TerrainMap, TerrainType};
+use crate::systems::world_gen::{TerrainMap, GroundConfigs};
 
 // Test utilities
+pub fn create_test_ground_configs() -> GroundConfigs {
+    let yaml_content = r#"
+water:
+  sprite: "tileset::grounds::water"
+  passable: false
+  height_min: 0.0
+  height_max: 0.5
+dirt:
+  sprite: "tileset::grounds::dirt"
+  passable: true
+  height_min: 0.6
+  height_max: 0.7
+grass:
+  sprite: "tileset::grounds::grass"
+  passable: true
+  height_min: 0.5
+  height_max: 0.6
+stone:
+  sprite: "tileset::grounds::stone"
+  passable: false
+  height_min: 0.7
+  height_max: 1.0
+"#;
+    GroundConfigs::load_from_yaml(yaml_content).expect("Failed to load test ground configs")
+}
+
 pub fn create_test_terrain_map(width: u32, height: u32, tile_size: f32) -> TerrainMap {
     let mut terrain_map = TerrainMap::new(width, height, tile_size);
+    let ground_configs = create_test_ground_configs();
     
     // Create a simple test pattern:
     // - Grass on edges
@@ -22,13 +49,13 @@ pub fn create_test_terrain_map(width: u32, height: u32, tile_size: f32) -> Terra
     for x in 0..width {
         for y in 0..height {
             let terrain = if x == 0 || x == width - 1 || y == 0 || y == height - 1 {
-                TerrainType::Grass
+                *ground_configs.terrain_mapping.get("grass").unwrap_or(&2) // Default to grass
             } else if x < width / 3 && y >= height / 3 && y < 2 * height / 3 {
-                TerrainType::Water
+                *ground_configs.terrain_mapping.get("water").unwrap_or(&0) // Default to water
             } else if x == width / 2 && y == height / 2 {
-                TerrainType::Stone
+                *ground_configs.terrain_mapping.get("stone").unwrap_or(&3)
             } else {
-                TerrainType::Grass
+                *ground_configs.terrain_mapping.get("grass").unwrap_or(&2) // Default to grass
             };
             terrain_map.set_tile(x, y, terrain);
         }

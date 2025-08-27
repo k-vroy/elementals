@@ -1,12 +1,13 @@
 use bevy::prelude::*;
 use crate::systems::pawn::{Pawn, spawn_pawn, TilesetManager};
 use crate::systems::pawn_config::PawnConfig;
-use crate::systems::world_gen::TerrainMap;
+use crate::systems::world_gen::{TerrainMap, GroundConfigs};
 
 pub fn spawn_all_pawns(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     terrain_map: Res<TerrainMap>,
+    ground_configs: Res<GroundConfigs>,
     pawn_config: Res<PawnConfig>,
     mut tileset_manager: ResMut<TilesetManager>,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
@@ -17,7 +18,7 @@ pub fn spawn_all_pawns(
             // Spawn the specified number of each pawn type
             for _ in 0..definition.spawn_count {
                 let pawn = Pawn::new(pawn_type.clone());
-                spawn_pawn(&mut commands, &asset_server, &terrain_map, &pawn_config, &mut tileset_manager, &mut texture_atlas_layouts, pawn, None);
+                spawn_pawn(&mut commands, &asset_server, &terrain_map, &ground_configs, &pawn_config, &mut tileset_manager, &mut texture_atlas_layouts, pawn, None);
             }
         }
     }

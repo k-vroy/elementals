@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::resources::GameConfig;
-use crate::systems::world_gen::{TerrainMap, TerrainType, TerrainChanges};
+use crate::systems::world_gen::{TerrainMap, TerrainChanges, GroundConfigs};
 use crate::systems::pawn::{Pawn, Size};
 use crate::systems::debug_display::DebugDisplayState;
 use crate::systems::async_pathfinding::{PathfindingRequest, PathfindingPriority};
@@ -11,6 +11,7 @@ pub fn handle_player_input(
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera>>,
     config: Res<GameConfig>,
     mut terrain_map: ResMut<TerrainMap>,
+    ground_configs: Res<GroundConfigs>,
     mut terrain_changes: ResMut<TerrainChanges>,
     debug_state: Res<DebugDisplayState>,
     mut commands: Commands,
@@ -69,10 +70,12 @@ pub fn handle_player_input(
                         let current_terrain = terrain_map.get_terrain_at_world_pos(world_position.x, world_position.y);
                         
                         if let Some(terrain_type) = current_terrain {
-                            let new_terrain = if terrain_type.is_passable() {
-                                TerrainType::Stone // Set to stone if currently passable
+                            let new_terrain = if ground_configs.is_passable(terrain_type) {
+                                // Set to stone if currently passable
+                                ground_configs.terrain_mapping.get("stone").copied().unwrap_or(2)
                             } else {
-                                TerrainType::Dirt  // Set to dirt if currently impassable
+                                // Set to dirt if currently impassable
+                                ground_configs.terrain_mapping.get("dirt").copied().unwrap_or(1)
                             };
                             
                             if terrain_map.set_tile_at_world_pos(world_position.x, world_position.y, new_terrain, &mut terrain_changes) {

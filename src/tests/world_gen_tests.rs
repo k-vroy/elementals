@@ -1,5 +1,5 @@
-use crate::systems::world_gen::{TerrainMap, TerrainType};
-use crate::tests::create_test_terrain_map;
+use crate::systems::world_gen::TerrainMap;
+use crate::tests::{create_test_terrain_map, create_test_ground_configs};
 
 #[cfg(test)]
 mod tests {
@@ -23,6 +23,10 @@ mod tests {
     #[test]
     fn test_all_terrain_types_present() {
         let terrain_map = create_test_terrain_map(10, 10, 32.0);
+        let ground_configs = create_test_ground_configs();
+        let grass_type = *ground_configs.terrain_mapping.get("grass").unwrap_or(&2);
+        let water_type = *ground_configs.terrain_mapping.get("water").unwrap_or(&0);
+        let stone_type = *ground_configs.terrain_mapping.get("stone").unwrap_or(&3);
         
         let mut found_grass = false;
         let mut found_water = false;
@@ -30,11 +34,13 @@ mod tests {
         
         for x in 0..terrain_map.width {
             for y in 0..terrain_map.height {
-                match terrain_map.tiles[x as usize][y as usize] {
-                    TerrainType::Grass => found_grass = true,
-                    TerrainType::Water => found_water = true,
-                    TerrainType::Stone => found_stone = true,
-                    _ => {}
+                let terrain_type = terrain_map.tiles[x as usize][y as usize];
+                if terrain_type == grass_type {
+                    found_grass = true;
+                } else if terrain_type == water_type {
+                    found_water = true;
+                } else if terrain_type == stone_type {
+                    found_stone = true;
                 }
             }
         }
@@ -46,41 +52,56 @@ mod tests {
 
     #[test]
     fn test_terrain_passability_rules() {
-        assert!(TerrainType::Grass.is_passable(), "Grass should be passable");
-        assert!(TerrainType::Dirt.is_passable(), "Dirt should be passable");
-        assert!(!TerrainType::Stone.is_passable(), "Stone should be impassable");
-        assert!(!TerrainType::Water.is_passable(), "Water should be impassable");
+        let ground_configs = create_test_ground_configs();
+        let grass_type = *ground_configs.terrain_mapping.get("grass").unwrap_or(&2);
+        let dirt_type = *ground_configs.terrain_mapping.get("dirt").unwrap_or(&1);
+        let stone_type = *ground_configs.terrain_mapping.get("stone").unwrap_or(&3);
+        let water_type = *ground_configs.terrain_mapping.get("water").unwrap_or(&0);
+        
+        assert!(ground_configs.is_passable(grass_type), "Grass should be passable");
+        assert!(ground_configs.is_passable(dirt_type), "Dirt should be passable");
+        assert!(!ground_configs.is_passable(stone_type), "Stone should be impassable");
+        assert!(!ground_configs.is_passable(water_type), "Water should be impassable");
     }
 
     #[test]
     fn test_tile_setting_and_getting() {
         let mut terrain_map = TerrainMap::new(5, 5, 32.0);
+        let ground_configs = create_test_ground_configs();
+        let grass_type = *ground_configs.terrain_mapping.get("grass").unwrap_or(&2);
+        let water_type = *ground_configs.terrain_mapping.get("water").unwrap_or(&0);
+        let stone_type = *ground_configs.terrain_mapping.get("stone").unwrap_or(&3);
+        let dirt_type = *ground_configs.terrain_mapping.get("dirt").unwrap_or(&1);
         
         // Set different terrain types
-        terrain_map.set_tile(0, 0, TerrainType::Grass);
-        terrain_map.set_tile(1, 1, TerrainType::Water);
-        terrain_map.set_tile(2, 2, TerrainType::Stone);
-        terrain_map.set_tile(3, 3, TerrainType::Dirt);
+        terrain_map.set_tile(0, 0, grass_type);
+        terrain_map.set_tile(1, 1, water_type);
+        terrain_map.set_tile(2, 2, stone_type);
+        terrain_map.set_tile(3, 3, dirt_type);
         
         // Verify they were set correctly
-        assert!(matches!(terrain_map.tiles[0][0], TerrainType::Grass));
-        assert!(matches!(terrain_map.tiles[1][1], TerrainType::Water));
-        assert!(matches!(terrain_map.tiles[2][2], TerrainType::Stone));
-        assert!(matches!(terrain_map.tiles[3][3], TerrainType::Dirt));
+        assert_eq!(terrain_map.tiles[0][0], grass_type);
+        assert_eq!(terrain_map.tiles[1][1], water_type);
+        assert_eq!(terrain_map.tiles[2][2], stone_type);
+        assert_eq!(terrain_map.tiles[3][3], dirt_type);
     }
 
     #[test]
     fn test_out_of_bounds_tile_setting() {
         let mut terrain_map = TerrainMap::new(3, 3, 32.0);
+        let ground_configs = create_test_ground_configs();
+        let grass_type = *ground_configs.terrain_mapping.get("grass").unwrap_or(&2);
+        let stone_type = *ground_configs.terrain_mapping.get("stone").unwrap_or(&3);
+        let water_type = *ground_configs.terrain_mapping.get("water").unwrap_or(&0);
         
         // These should not panic or corrupt memory
-        terrain_map.set_tile(10, 10, TerrainType::Stone);
-        terrain_map.set_tile(u32::MAX, u32::MAX, TerrainType::Water);
+        terrain_map.set_tile(10, 10, stone_type);
+        terrain_map.set_tile(u32::MAX, u32::MAX, water_type);
         
-        // Original tiles should be unchanged
+        // Original tiles should be unchanged (default to 0)
         for x in 0..3 {
             for y in 0..3 {
-                assert!(matches!(terrain_map.tiles[x][y], TerrainType::Grass));
+                assert_eq!(terrain_map.tiles[x][y], 0);
             }
         }
     }
@@ -88,16 +109,18 @@ mod tests {
     #[test]
     fn test_world_position_terrain_lookup() {
         let mut terrain_map = TerrainMap::new(5, 5, 32.0);
+        let ground_configs = create_test_ground_configs();
+        let water_type = *ground_configs.terrain_mapping.get("water").unwrap_or(&0);
         
         // Set a specific tile to water
-        terrain_map.set_tile(2, 2, TerrainType::Water);
+        terrain_map.set_tile(2, 2, water_type);
         
         // Get world coordinates for that tile
         let (world_x, world_y) = terrain_map.tile_to_world_coords(2, 2);
         
         // Look up terrain at those world coordinates
         let terrain = terrain_map.get_terrain_at_world_pos(world_x, world_y);
-        assert!(matches!(terrain, Some(TerrainType::Water)));
+        assert_eq!(terrain, Some(water_type));
     }
 
     #[test]
@@ -137,18 +160,21 @@ mod tests {
     fn test_passable_tile_finder() {
         // Create a map with mostly impassable terrain
         let mut terrain_map = TerrainMap::new(5, 5, 32.0);
+        let ground_configs = create_test_ground_configs();
+        let stone_type = *ground_configs.terrain_mapping.get("stone").unwrap_or(&3);
+        let grass_type = *ground_configs.terrain_mapping.get("grass").unwrap_or(&2);
         
         // Fill with stone (impassable)
         for x in 0..5 {
             for y in 0..5 {
-                terrain_map.set_tile(x, y, TerrainType::Stone);
+                terrain_map.set_tile(x, y, stone_type);
             }
         }
         
         // Make one tile passable
-        terrain_map.set_tile(3, 3, TerrainType::Grass);
+        terrain_map.set_tile(3, 3, grass_type);
         
-        let passable_pos = terrain_map.find_nearest_passable_tile((0.0, 0.0));
+        let passable_pos = terrain_map.find_nearest_passable_tile((0.0, 0.0), &ground_configs);
         assert!(passable_pos.is_some(), "Should find the one passable tile");
         
         let (px, py) = passable_pos.unwrap();
@@ -160,15 +186,17 @@ mod tests {
     fn test_no_passable_tile_available() {
         // Create a map with no passable terrain
         let mut terrain_map = TerrainMap::new(3, 3, 32.0);
+        let ground_configs = create_test_ground_configs();
+        let stone_type = *ground_configs.terrain_mapping.get("stone").unwrap_or(&3);
         
         // Fill entirely with stone
         for x in 0..3 {
             for y in 0..3 {
-                terrain_map.set_tile(x, y, TerrainType::Stone);
+                terrain_map.set_tile(x, y, stone_type);
             }
         }
         
-        let passable_pos = terrain_map.find_nearest_passable_tile((0.0, 0.0));
+        let passable_pos = terrain_map.find_nearest_passable_tile((0.0, 0.0), &ground_configs);
         assert!(passable_pos.is_none(), "Should return None when no passable tiles exist");
     }
 
@@ -206,11 +234,11 @@ mod tests {
     fn test_terrain_map_default_initialization() {
         let terrain_map = TerrainMap::new(3, 3, 16.0);
         
-        // All tiles should default to grass
+        // All tiles should default to 0 (first terrain type)
         for x in 0..3 {
             for y in 0..3 {
-                assert!(matches!(terrain_map.tiles[x][y], TerrainType::Grass),
-                       "Default terrain should be grass for tile ({}, {})", x, y);
+                assert_eq!(terrain_map.tiles[x][y], 0,
+                       "Default terrain should be 0 for tile ({}, {})", x, y);
             }
         }
     }

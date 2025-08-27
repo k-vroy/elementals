@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::systems::world_gen::TerrainMap;
+use crate::systems::world_gen::{TerrainMap, GroundConfigs};
 use crate::systems::pawn_config::{PawnConfig, PawnType, BehaviourConfig, BehaviourType};
 use crate::resources::GameConfig;
 use serde::{Deserialize, Serialize};
@@ -176,6 +176,7 @@ pub fn spawn_pawn(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
     terrain_map: &Res<TerrainMap>,
+    ground_configs: &Res<GroundConfigs>,
     pawn_config: &Res<PawnConfig>,
     tileset_manager: &mut ResMut<TilesetManager>,
     texture_atlas_layouts: &mut ResMut<Assets<TextureAtlasLayout>>,
@@ -187,7 +188,7 @@ pub fn spawn_pawn(
     } else {
         // Find a passable spawn position
         let initial_center = (0.0, 0.0);
-        if let Some(passable_pos) = terrain_map.find_nearest_passable_tile(initial_center) {
+        if let Some(passable_pos) = terrain_map.find_nearest_passable_tile(initial_center, ground_configs) {
             passable_pos
         } else {
             (0.0, 0.0) // Fallback

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::render_resource::{AsBindGroup, ShaderRef};
 use bevy::sprite::{Material2d, Material2dPlugin, MeshMaterial2d};
-use crate::systems::world_gen::{TerrainMap, TerrainType};
+use crate::systems::world_gen::{TerrainMap, GroundConfigs};
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct WaterMaterial {
@@ -40,6 +40,7 @@ pub struct WaterTile;
 pub fn spawn_water_overlays(
     mut commands: Commands,
     terrain_map: Res<TerrainMap>,
+    ground_configs: Res<GroundConfigs>,
     mut materials: ResMut<Assets<WaterMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
@@ -48,7 +49,9 @@ pub fn spawn_water_overlays(
 
     for x in 0..terrain_map.width {
         for y in 0..terrain_map.height {
-            if matches!(terrain_map.tiles[x as usize][y as usize], TerrainType::Water) {
+            let terrain_type = terrain_map.tiles[x as usize][y as usize];
+            if let Some(water_type) = ground_configs.terrain_mapping.get("water") {
+                if terrain_type == *water_type {
                 let (world_x, world_y) = terrain_map.tile_to_world_coords(x as i32, y as i32);
                 
                 commands.spawn((
@@ -57,6 +60,7 @@ pub fn spawn_water_overlays(
                     Transform::from_translation(Vec3::new(world_x, world_y, 0.5)),
                     WaterTile,
                 ));
+                }
             }
         }
     }
