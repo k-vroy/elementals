@@ -127,15 +127,17 @@ pub fn spawn_pathfinding_tasks(
         });
         
         // Replace PathfindingRequest with PathfindingTask
-        commands.entity(entity)
-            .remove::<PathfindingRequest>()
-            .insert(PathfindingTask {
-                task,
-                start,
-                goal,
-                size,
-                request_id,
-            });
+        if let Some(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands
+                .remove::<PathfindingRequest>()
+                .insert(PathfindingTask {
+                    task,
+                    start,
+                    goal,
+                    size,
+                    request_id,
+                });
+        }
     }
 }
 
@@ -154,12 +156,16 @@ pub fn handle_completed_pathfinding(
                 let mut pawn_target = PawnTarget::new(target_pos);
                 pawn_target.set_path(path);
                 
-                commands.entity(entity)
-                    .remove::<PathfindingTask>()
-                    .insert(pawn_target);
+                if let Some(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands
+                        .remove::<PathfindingTask>()
+                        .insert(pawn_target);
+                }
             } else {
                 // No path found, just remove the task
-                commands.entity(entity).remove::<PathfindingTask>();
+                if let Some(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands.remove::<PathfindingTask>();
+                }
             }
         }
     }
@@ -196,12 +202,16 @@ pub fn spawn_cached_pathfinding_tasks(
                     let mut pawn_target = PawnTarget::new(target_pos);
                     pawn_target.set_path(path.clone());
                     
-                    commands.entity(entity)
-                        .remove::<PathfindingRequest>()
-                        .insert(pawn_target);
+                    if let Some(mut entity_commands) = commands.get_entity(entity) {
+                        entity_commands
+                            .remove::<PathfindingRequest>()
+                            .insert(pawn_target);
+                    }
                 } else {
                     // Cached "no path" result
-                    commands.entity(entity).remove::<PathfindingRequest>();
+                    if let Some(mut entity_commands) = commands.get_entity(entity) {
+                        entity_commands.remove::<PathfindingRequest>();
+                    }
                 }
                 continue;
             }
@@ -227,15 +237,17 @@ pub fn spawn_cached_pathfinding_tasks(
             }
         });
         
-        commands.entity(entity)
-            .remove::<PathfindingRequest>()
-            .insert(PathfindingTask {
-                task,
-                start,
-                goal,
-                size,
-                request_id,
-            });
+        if let Some(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands
+                .remove::<PathfindingRequest>()
+                .insert(PathfindingTask {
+                    task,
+                    start,
+                    goal,
+                    size,
+                    request_id,
+                });
+        }
     }
 }
 
@@ -262,11 +274,15 @@ pub fn handle_completed_cached_pathfinding(
                 let mut pawn_target = PawnTarget::new(target_pos);
                 pawn_target.set_path(path);
                 
-                commands.entity(entity)
-                    .remove::<PathfindingTask>()
-                    .insert(pawn_target);
+                if let Some(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands
+                        .remove::<PathfindingTask>()
+                        .insert(pawn_target);
+                }
             } else {
-                commands.entity(entity).remove::<PathfindingTask>();
+                if let Some(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands.remove::<PathfindingTask>();
+                }
             }
         }
     }
@@ -292,7 +308,9 @@ pub fn request_pathfinding(
     goal: (f32, f32),
     size: f32,
 ) {
-    commands.entity(entity).insert(PathfindingRequest::new(start, goal, size));
+    if let Some(mut entity_commands) = commands.get_entity(entity) {
+        entity_commands.insert(PathfindingRequest::new(start, goal, size));
+    }
 }
 
 /// Helper function to request high-priority pathfinding (e.g., player input)
@@ -304,7 +322,9 @@ pub fn request_priority_pathfinding(
     size: f32,
     priority: PathfindingPriority,
 ) {
-    commands.entity(entity).insert(
-        PathfindingRequest::new(start, goal, size).with_priority(priority)
-    );
+    if let Some(mut entity_commands) = commands.get_entity(entity) {
+        entity_commands.insert(
+            PathfindingRequest::new(start, goal, size).with_priority(priority)
+        );
+    }
 }
