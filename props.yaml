@@ -1,10 +1,10 @@
 tree:
   sprite: "tileset::props::tree"
   spawn: 
-    on_floor: 
-      grass: 1/100
+    floors: 
+      grass: 3/100
 mushroom:
   sprite: "tileset::props::mushroom"
   spawn: 
-    on_floor: 
-      dirt: 1/10
+    floor: 
+      dirt: 5/100

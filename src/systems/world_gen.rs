@@ -35,6 +35,62 @@ pub struct TilesetIndex {
     pub sprites: Vec<SpriteInfo>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PropsConfig {
+    pub sprite: String,
+    pub spawn: PropsSpawn,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PropsSpawn {
+    pub floors: Option<HashMap<String, String>>, // floor_type: spawn_rate (e.g. "1/100")
+    pub floor: Option<HashMap<String, String>>,  // alternate naming
+}
+
+#[derive(Debug, Clone, Resource)]
+pub struct PropsConfigs {
+    pub configs: HashMap<String, PropsConfig>,
+    pub tileset_indices: HashMap<String, TilesetIndex>, // Maps tileset names to their sprite indices
+}
+
+impl PropsConfigs {
+    pub fn load_from_yaml(yaml_content: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let configs: HashMap<String, PropsConfig> = serde_yaml::from_str(yaml_content)?;
+        
+        Ok(Self {
+            configs,
+            tileset_indices: HashMap::new(),
+        })
+    }
+    
+    pub fn add_tileset(&mut self, tileset: TilesetIndex) {
+        self.tileset_indices.insert(tileset.tileset_name.clone(), tileset);
+    }
+    
+    pub fn resolve_sprite_path_to_index(&self, sprite_path: &str) -> Option<u32> {
+        // Parse sprite path format: "tileset::tileset_name::sprite_name"
+        let parts: Vec<&str> = sprite_path.split("::").collect();
+        if parts.len() != 3 || parts[0] != "tileset" {
+            return None;
+        }
+
+        let tileset_name = parts[1];
+        let sprite_name = parts[2];
+
+        // Look up the tileset
+        let tileset_index = self.tileset_indices.get(tileset_name)?;
+
+        // Find the sprite by name
+        for sprite in &tileset_index.sprites {
+            if sprite.name == sprite_name {
+                return Some(sprite.index);
+            }
+        }
+
+        None
+    }
+}
+
 #[derive(Debug, Clone, Resource)]
 pub struct GroundConfigs {
     pub configs: HashMap<String, GroundConfig>,
@@ -623,6 +679,20 @@ pub fn generate_world(
         .expect("Failed to read grounds.yaml file");
     let ground_configs = GroundConfigs::load_from_yaml(&grounds_yaml)
         .expect("Failed to parse grounds.yaml");
+    
+    // Load props configuration from YAML
+    let props_yaml = std::fs::read_to_string("props.yaml")
+        .expect("Failed to read props.yaml file");
+    let mut props_configs = PropsConfigs::load_from_yaml(&props_yaml)
+        .expect("Failed to parse props.yaml");
+    
+    // Load props tileset configuration
+    let props_tileset_yaml = std::fs::read_to_string("assets/tilesets/props.yaml")
+        .expect("Failed to read assets/tilesets/props.yaml file");
+    let props_tileset: TilesetIndex = serde_yaml::from_str(&props_tileset_yaml)
+        .expect("Failed to parse props tileset yaml");
+    props_configs.add_tileset(props_tileset);
+    
     let map_size = TilemapSize { 
         x: config.map_width, 
         y: config.map_height 
@@ -640,14 +710,15 @@ pub fn generate_world(
     // Generate ground layer and populate terrain map
     generate_ground_layer(&mut commands, &asset_server, &map_size, &tile_size, &grid_size, &map_type, &mut terrain_map, &ground_configs);
     
-    // Insert the populated terrain map and ground configs as resources
+    // Generate props layer
+    generate_props_layer(&mut commands, &asset_server, &map_size, &tile_size, &grid_size, &map_type, &terrain_map, &ground_configs, &props_configs);
+    
+    // Insert the populated terrain map and configs as resources
     commands.insert_resource(terrain_map);
     commands.insert_resource(ground_configs);
+    commands.insert_resource(props_configs);
     
-    // Generate objects layer
-    // generate_objects_layer(&mut commands, &asset_server, &map_size, &tile_size, &grid_size, &map_type);
-    
-    // Generate decoration layer
+    // Generate decoration layer (if needed)
     // generate_decoration_layer(&mut commands, &asset_server, &map_size, &tile_size, &grid_size, &map_type);
 }
 
@@ -718,41 +789,65 @@ fn generate_ground_layer(
     });
 }
 
-fn generate_objects_layer(
+fn generate_props_layer(
     commands: &mut Commands,
     asset_server: &AssetServer,
     map_size: &TilemapSize,
     tile_size: &TilemapTileSize,
     grid_size: &TilemapGridSize,
     map_type: &TilemapType,
+    terrain_map: &TerrainMap,
+    ground_configs: &GroundConfigs,
+    props_configs: &PropsConfigs,
 ) {
-    let texture_handle: Handle<Image> = asset_server.load("objects_tileset.png");
+    let texture_handle: Handle<Image> = asset_server.load("tilesets/props.png");
     let tilemap_entity = commands.spawn_empty().id();
     let mut tile_storage = TileStorage::empty(*map_size);
     let mut rng = rand::thread_rng();
 
+
     for x in 1..map_size.x - 1 { // Skip borders
         for y in 1..map_size.y - 1 {
             let tile_pos = TilePos { x, y };
-            
-            // Sparse object placement
-            if rng.gen_ratio(1, 8) {
-                let object_type = match rng.gen_range(0..4) {
-                    0 => ObjectType::Tree,
-                    1 => ObjectType::Rock,
-                    2 => ObjectType::Wall,
-                    _ => ObjectType::Chest,
-                };
 
-                let tile_entity = commands
-                    .spawn(TileBundle {
-                        position: tile_pos,
-                        tilemap_id: TilemapId(tilemap_entity),
-                        texture_index: TileTextureIndex(object_type as u32),
-                        ..Default::default()
-                    })
-                    .id();
-                tile_storage.set(&tile_pos, tile_entity);
+            // Get the terrain type at this position
+            let terrain_type = terrain_map.tiles[x as usize][y as usize];
+
+            // Find the terrain name from the terrain type
+            let terrain_name = ground_configs.configs.iter()
+                .find(|(name, _)| ground_configs.terrain_mapping.get(*name).copied() == Some(terrain_type))
+                .map(|(name, _)| name.as_str());
+
+            if let Some(terrain_name) = terrain_name {
+                // Check each prop type to see if it should spawn on this terrain
+                for (_prop_name, prop_config) in &props_configs.configs {
+                    let spawn_floors = prop_config.spawn.floors.as_ref().or(prop_config.spawn.floor.as_ref());
+
+                    if let Some(floors) = spawn_floors {
+                        if let Some(spawn_rate_str) = floors.get(terrain_name) {
+                            // Parse spawn rate (e.g., "1/100" means 1 in 100 chance)
+                            if let Some((numerator, denominator)) = spawn_rate_str.split_once('/') {
+                                if let (Ok(num), Ok(den)) = (numerator.parse::<u32>(), denominator.parse::<u32>()) {
+                                    if rng.gen_ratio(num, den) {
+                                        // Spawn this prop
+                                        if let Some(texture_index) = props_configs.resolve_sprite_path_to_index(&prop_config.sprite) {
+                                            let tile_entity = commands
+                                                .spawn(TileBundle {
+                                                    position: tile_pos,
+                                                    tilemap_id: TilemapId(tilemap_entity),
+                                                    texture_index: TileTextureIndex(texture_index),
+                                                    ..Default::default()
+                                                })
+                                                .id();
+                                            tile_storage.set(&tile_pos, tile_entity);
+                                            break; // Only spawn one prop per tile
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
